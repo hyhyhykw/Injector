@@ -1,0 +1,11 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_7
+    targetCompatibility = JavaVersion.VERSION_1_7
+}
+
+apply plugin: 'com.github.dcendents.android-maven' // 添加这个
+group='com.github.hyhyhykw'	// 指定group，com.github.<用户名>
