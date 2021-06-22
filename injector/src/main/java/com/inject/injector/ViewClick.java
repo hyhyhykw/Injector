@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
  * Created time : 2021/6/22 7:51.
  *
  * @author 10585
+ * @see com.inject.annotation.OnClick
  */
 public final class ViewClick {
     private static long lastClickTime;
@@ -25,14 +26,14 @@ public final class ViewClick {
     }
 
     /**
-     * 视图点击事件的封装，防止点击过快
+     * 视图点击事件的封装，防止点击过快 null处理，防止崩溃
      *
      * @param view     视图
      * @param listener 点击事件
      */
     public static void setViewClick(@Nullable View view,
                                     @Nullable final View.OnClickListener listener) {
-        setViewClick(view,true, listener);
+        setViewClick(view, true, listener);
     }
 
     /**

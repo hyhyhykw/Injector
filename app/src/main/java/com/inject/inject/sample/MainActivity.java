@@ -3,11 +3,15 @@ package com.inject.inject.sample;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.inject.annotation.BindView;
+import com.inject.annotation.BindViews;
 import com.inject.annotation.OnClick;
 import com.inject.injector.Inject;
+
+import java.util.List;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -17,6 +21,25 @@ public class MainActivity extends AppCompatActivity {
     TextView mTv;
     @BindView("tv1")
     TextView mTv1;
+
+    @BindViews({
+            "tv",
+            "tv1",
+            "btn"
+    })
+    List<TextView> tvs;
+
+    @BindViews({
+            "tv",
+            "tv1"
+    })
+    View[] tvs1;
+
+    @BindViews({
+            "btn",
+            "btn1"
+    })
+    Button[] btns;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

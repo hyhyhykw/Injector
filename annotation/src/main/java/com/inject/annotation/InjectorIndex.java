@@ -7,6 +7,7 @@ import java.util.Map;
  * 因为ButterKnife生成的代码不能混淆，所以用这种方法生成索引
  *
  * @author 10585
+ * @see Injector
  */
 public interface InjectorIndex {
 

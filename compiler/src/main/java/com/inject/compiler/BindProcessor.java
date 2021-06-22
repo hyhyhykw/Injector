@@ -1,6 +1,7 @@
 package com.inject.compiler;
 
 import com.inject.annotation.BindView;
+import com.inject.annotation.BindViews;
 import com.inject.annotation.Injector;
 import com.inject.annotation.InjectorIndex;
 import com.inject.annotation.OnClick;
@@ -18,9 +19,12 @@ import com.squareup.javapoet.WildcardTypeName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -29,14 +33,15 @@ import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 
 /**
  * Created time : 2021/6/20 11:53.
@@ -77,6 +82,7 @@ public class BindProcessor extends AbstractProcessor {
         Set<String> types = new HashSet<>();
         types.add(BindView.class.getName());
         types.add(OnClick.class.getName());
+        types.add(BindViews.class.getName());
         return types;
     }
 
@@ -87,7 +93,6 @@ public class BindProcessor extends AbstractProcessor {
         super.init(processingEnv);
         isProcessed = false;
     }
-
 
     private boolean isEmpty(String str) {
         return str == null || str.length() == 0;
@@ -130,7 +135,24 @@ public class BindProcessor extends AbstractProcessor {
         return customInjects;
     }
 
-    Set<CustomInject> customInjects;
+    private Set<CustomInject> customInjects;
+
+    private static final String REGEX_LIST_VIEWS = "java\\.util\\.List<(.+?)>";
+    private static final String REGEX_COLLECTION_VIEWS = "java\\.util\\.Collection<(.+?)>";
+    private static final String REGEX_ARRAYLIST_VIEWS = "java\\.util\\.ArrayList<(.+?)>";
+
+    private static final String REGEX_LINKED_VIEWS = "java\\.util\\.LinkedList<(.+?)>";
+
+    private static final String REGEX_ARRAY_VIEWS = "(.+?)\\[]";
+
+
+    private static final Pattern patterListViews = Pattern.compile(REGEX_LIST_VIEWS);
+    private static final Pattern patterCollectionViews = Pattern.compile(REGEX_COLLECTION_VIEWS);
+    private static final Pattern patterArrayListViews = Pattern.compile(REGEX_ARRAYLIST_VIEWS);
+
+    private static final Pattern patterLinkedListViews = Pattern.compile(REGEX_LINKED_VIEWS);
+
+    private static final Pattern patterArrayViews = Pattern.compile(REGEX_ARRAY_VIEWS);
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -140,76 +162,18 @@ public class BindProcessor extends AbstractProcessor {
 
         String pkgName = processingEnv.getOptions().get(OPTION_PKG_NAME);
         String indexName = processingEnv.getOptions().get(OPTION_INDEX);
+        Elements elementUtils = processingEnv.getElementUtils();
 
-        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(BindView.class);
+        Map<String, JavaFileInfo> specs = new HashMap<>();
 
-        Map<String, VarInfo> specs = new HashMap<>();
+        //获取BindView注解的所有信息
+        parseBindView(roundEnv, elementUtils, specs);
 
-        for (Element element : elements) {
-            if (!(element instanceof VariableElement)) continue;
-            VariableElement variableElement = (VariableElement) element;
-            //类信息
-            TypeElement typeElement = (TypeElement) variableElement.getEnclosingElement();
-            /*类的绝对路径 全类名*/
-            String qualifiedName = typeElement.getQualifiedName().toString();
+        //获取BindViews注解的所有信息
+        parseBindViews(roundEnv, elementUtils, specs);
 
-            /*类名*/
-            String clsName = typeElement.getSimpleName().toString();
-            /*获取包名*/
-            String packageName = processingEnv.getElementUtils()
-                    .getPackageOf(typeElement).getQualifiedName().toString();
-
-            BindView annotation = variableElement.getAnnotation(BindView.class);
-            String value = annotation.value();
-            String[] split = value.split("\\.");
-            String id = split[split.length - 1];
-
-            VarInfo varInfo = specs.get(qualifiedName);
-            if (varInfo == null) {
-                varInfo = new VarInfo(qualifiedName, packageName, clsName, typeElement);
-                specs.put(qualifiedName, varInfo);
-            }
-            varInfo.varMap.put(id, variableElement);
-        }
-
-
-        Set<? extends Element> elements1 = roundEnv.getElementsAnnotatedWith(OnClick.class);
-        for (Element element : elements1) {
-            ElementKind kind = element.getKind();
-            if (kind != ElementKind.METHOD) continue;
-            OnClick onClick = element.getAnnotation(OnClick.class);
-            String[] values = onClick.value();
-            boolean fast = onClick.fast();
-
-            ExecutableElement executableElement = (ExecutableElement) element;
-            TypeElement typeElement = (TypeElement) element.getEnclosingElement();
-
-            /*类的绝对路径 全类名*/
-            String qualifiedName = typeElement.getQualifiedName().toString();
-
-            /*类名*/
-            String clsName = typeElement.getSimpleName().toString();
-            /*获取包名*/
-            String packageName = processingEnv.getElementUtils()
-                    .getPackageOf(typeElement).getQualifiedName().toString();
-
-
-            List<String> ids = new ArrayList<>();
-            for (String value : values) {
-                String[] split = value.split("\\.");
-                String id = split[split.length - 1];
-                ids.add(id);
-            }
-
-            VarInfo varInfo = specs.get(qualifiedName);
-            if (varInfo == null) {
-                varInfo = new VarInfo(qualifiedName, packageName, clsName, typeElement);
-                specs.put(qualifiedName, varInfo);
-            }
-
-            varInfo.methodMap.add(new MethodInfo(ids, fast, executableElement));
-        }
-
+        //获取OnClick注解的所有信息
+        parseOnClick(roundEnv, elementUtils, specs);
 
         try {
             createCode(specs, pkgName, indexName);
@@ -219,7 +183,30 @@ public class BindProcessor extends AbstractProcessor {
         return true;
     }
 
-    private void createCode(Map<String, VarInfo> specs,
+    private ClassName getByFullName(String fullName, String packageName) {
+        String substring = fullName.replace(packageName, "")
+                .substring(1);
+
+        String[] split = substring.split("\\.");
+        ClassName instance;
+        if (split.length > 1) {
+            String[] strings = new String[split.length - 1];
+
+            for (int i = 0; i < split.length; i++) {
+                if (i == 0) continue;
+                String s = split[i];
+                strings[i - 1] = s;
+            }
+
+            instance = ClassName.get(packageName, split[0], strings);
+        } else {
+            instance = ClassName.get(packageName, substring);
+        }
+
+        return instance;
+    }
+
+    private void createCode(Map<String, JavaFileInfo> specs,
                             String pkgName,
                             String indexName) throws Exception {
         ClassName rCla = ClassName.get(pkgName, "R");
@@ -236,30 +223,15 @@ public class BindProcessor extends AbstractProcessor {
 
         CodeBlock.Builder codeBuilder = CodeBlock.builder();
 
-        for (VarInfo value : specs.values()) {
+        for (JavaFileInfo value : specs.values()) {
             TypeElement type = value.type;
             CustomInject custom = getCustom(type);
 
             String claName = value.claName;
             String packageName = value.packageName;
             String qualifiedName = value.qualifiedName;
-            String substring = qualifiedName.replace(packageName, "")
-                    .substring(1);
-            String[] split = substring.split("\\.");
-            ClassName instance;
-            if (split.length > 1) {
-                String[] strings = new String[split.length - 1];
 
-                for (int i = 0; i < split.length; i++) {
-                    if (i == 0) continue;
-                    String s = split[i];
-                    strings[i - 1] = s;
-                }
-
-                instance = ClassName.get(packageName, split[0], strings);
-            } else {
-                instance = ClassName.get(packageName, claName);
-            }
+            ClassName instance = getByFullName(qualifiedName, packageName);
 
             CodeBlock.Builder injectBuilder = CodeBlock.builder();
             injectBuilder.addStatement("$T instance = ($T) object", instance, instance);
@@ -275,16 +247,24 @@ public class BindProcessor extends AbstractProcessor {
                 }
             }
 
-            Set<MethodInfo> methodMap = value.methodMap;
+            Map<String, VariableElement> varMap = value.javaFileMap;
+            Set<MethodInfo> methodMap = value.onClickMethodMap;
+            Set<ViewsBindInfo> viewsList = value.viewsList;
 
             ClassName viewClick = ClassName.get("com.inject.injector", "ViewClick");
 
+            injectBuilder.add("\n");
 
-            for (Map.Entry<String, VariableElement> entry : value.varMap.entrySet()) {
+            HashMap<String, IdViewInfo> viewsMap = new HashMap<>();
+
+            //BindView
+            for (Map.Entry<String, VariableElement> entry : varMap.entrySet()) {
                 String id = entry.getKey();
                 VariableElement entryValue = entry.getValue();
 
                 String name = entryValue.getSimpleName().toString();
+
+                viewsMap.put(id, new IdViewInfo("instance." + name, (DeclaredType) entryValue.asType()));
 
                 if (custom != null) {
                     if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
@@ -298,42 +278,120 @@ public class BindProcessor extends AbstractProcessor {
                     injectBuilder.addStatement("instance.$N = instance.findViewById($T.id.$L)",
                             name, rCla, id);
                 }
+            }
+            injectBuilder.add("\n");
+            //BindViews
+            for (ViewsBindInfo info : viewsList) {
+                List<String> ids = info.ids;
 
-                for (MethodInfo info : methodMap) {
-                    List<String> ids = info.ids;
-                    ExecutableElement methodElement = info.methodElement;
-                    String methodName = methodElement.getSimpleName().toString();
+                VariableElement variableElement = info.variableElement;
+                String varName = variableElement.getSimpleName().toString();
 
-                    if (ids.contains(id)) {
-                        injectBuilder.addStatement(
-                                "$T.setViewClick(instance.$N,$L, instance::$N)", viewClick, name, info.fast, methodName
-                        );
+                String eleQualifiedName = info.eleQualifiedName;
+                String elePackageName = info.elePackageName;
 
-                        ids.remove(id);
+                ClassName params = getByFullName(eleQualifiedName, elePackageName);
+
+                ViewsType viewsType = info.type;
+
+                switch (viewsType) {
+                    default:
+                    case ArrayList:
+                        injectBuilder.addStatement("instance.$N = new $T<>()", varName, ClassName.get(ArrayList.class));
+                        break;
+                    case LinkedList:
+                        injectBuilder.addStatement("instance.$N = new $T<>()", varName, ClassName.get(LinkedList.class));
+                        break;
+                    case Array:
+                        injectBuilder.addStatement("instance.$N = new $T[$L]", varName, params, ids.size());
+                        break;
+                }
+
+                for (int i = 0; i < ids.size(); i++) {
+                    String viewId = ids.get(i);
+
+                    IdViewInfo idViewInfo = viewsMap.get(viewId);
+
+                    String viewName;
+                    boolean needCast;
+                    if (idViewInfo == null) {
+                        needCast = false;
+                        viewName = varName + i;
+                        viewsMap.put(viewId, new IdViewInfo(viewName, info.paramsType));
+
+                        if (custom != null) {
+                            if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
+                                injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
+                                        params, viewName, custom.method, rCla, viewId);
+                            } else {
+                                injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
+                                        params, viewName, rCla, viewId);
+                            }
+                        } else {
+                            injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$L)",
+                                    params, viewName, rCla, viewId);
+                        }
+                    } else {
+                        viewName = idViewInfo.name;
+                        DeclaredType viewType = idViewInfo.type;
+                        needCast = !isNotNeedCast(eleQualifiedName, viewType);
+                    }
+
+                    switch (viewsType) {
+                        case ArrayList:
+                        case LinkedList:
+                        default:
+                            if (needCast) {
+                                injectBuilder.addStatement("instance.$N.add(($T) $N)",
+                                        varName, params, viewName);
+                            } else {
+                                injectBuilder.addStatement("instance.$N.add($N)",
+                                        varName, viewName);
+                            }
+                            break;
+                        case Array:
+                            if (needCast) {
+                                injectBuilder.addStatement("instance.$N[$L] = ($T) $N",
+                                        varName, i, params, viewName);
+                            } else {
+                                injectBuilder.addStatement("instance.$N[$L] = $N",
+                                        varName, i, viewName);
+                            }
+                            break;
                     }
                 }
             }
-
+            injectBuilder.add("\n");
+            //onClick 方法
             for (MethodInfo info : methodMap) {
                 List<String> ids = info.ids;
                 ExecutableElement methodElement = info.methodElement;
                 String methodName = methodElement.getSimpleName().toString();
 
-                for (String s : ids) {
-                    if (custom != null) {
-                        if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                            injectBuilder.addStatement("$T.setViewClick(instance.$L($T.id.$L), $L, instance::$N)",
-                                    viewClick, custom.method, rCla, s, info.fast, methodName);
-                        } else {
-                            injectBuilder.addStatement("$T.setViewClick(view.findViewById($T.id.$L), $L, instance::$N)",
-                                    viewClick, rCla, s, info.fast, methodName);
-                        }
+                for (String viewId : ids) {
+                    IdViewInfo idViewInfo = viewsMap.get(viewId);
+
+                    if (idViewInfo != null) {
+                        injectBuilder.addStatement("$T.setViewClick($N, $L, instance::$N)",
+                                viewClick, idViewInfo.name, info.fast, methodName);
                     } else {
-                        injectBuilder.addStatement("$T.setViewClick(instance.findViewById($T.id.$L),$L, instance::$N)",
-                                viewClick, rCla, s, info.fast, methodName);
+                        if (custom != null) {
+                            if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
+                                injectBuilder.addStatement("$T.setViewClick(instance.$L($T.id.$L), $L, instance::$N)",
+                                        viewClick, custom.method, rCla, viewId, info.fast, methodName);
+                            } else {
+                                injectBuilder.addStatement("$T.setViewClick(view.findViewById($T.id.$L), $L, instance::$N)",
+                                        viewClick, rCla, viewId, info.fast, methodName);
+                            }
+                        } else {
+                            injectBuilder.addStatement("$T.setViewClick(instance.findViewById($T.id.$L),$L, instance::$N)",
+                                    viewClick, rCla, viewId, info.fast, methodName);
+                        }
                     }
+
                 }
             }
+
 
             ParameterSpec.Builder param = ParameterSpec.builder(Object.class, "object");
 
@@ -352,6 +410,8 @@ public class BindProcessor extends AbstractProcessor {
                     .build();
 
             JavaFile javaFile = JavaFile.builder(packageName, build)
+                    .indent("    ")
+                    .skipJavaLangImports(true)
                     .build();
 
             javaFile.writeTo(processingEnv.getFiler());
@@ -362,13 +422,11 @@ public class BindProcessor extends AbstractProcessor {
                     className);
         }
 
-
         MethodSpec.Builder indexMethod = MethodSpec.methodBuilder("getIndex")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(typeName)
                 .addStatement("return $N", indexField);
-
 
         TypeSpec build = TypeSpec.classBuilder(indexName)
                 .addModifiers(Modifier.FINAL, Modifier.PUBLIC)
@@ -379,11 +437,33 @@ public class BindProcessor extends AbstractProcessor {
                 .build();
 
         JavaFile javaFile = JavaFile.builder(pkgName, build)
+                .indent("    ")
+                .skipJavaLangImports(true)
                 .build();
 
 
         javaFile.writeTo(processingEnv.getFiler());
+    }
 
+    private boolean isNotNeedCast(String qualifiedName, DeclaredType viewType) {
+        TypeElement type = (TypeElement) viewType.asElement();
+        if (qualifiedName.equals(type.getQualifiedName().toString())) {
+            return true;
+        }
+        TypeMirror superclass = type.getSuperclass();
+        TypeKind kind = superclass.getKind();
+        while (kind == TypeKind.DECLARED) {
+            DeclaredType declaredType = (DeclaredType) superclass;
+            TypeElement element = (TypeElement) declaredType.asElement();
+            String className = element.getQualifiedName().toString();
+            if (qualifiedName.equals(className)) return true;
+
+            superclass = element.getSuperclass();
+            kind = superclass.getKind();
+        }
+
+
+        return false;
     }
 
     private CustomInject getCustom(TypeElement type) {
@@ -406,4 +486,185 @@ public class BindProcessor extends AbstractProcessor {
         return null;
 
     }
+
+    //获取OnClick注解的所有信息
+    private static void parseOnClick(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
+        Set<? extends Element> onClicks = roundEnv.getElementsAnnotatedWith(OnClick.class);
+        for (Element element : onClicks) {
+            OnClick onClick = element.getAnnotation(OnClick.class);
+            String[] values = onClick.value();
+            boolean fast = onClick.fast();
+
+            ExecutableElement executableElement = (ExecutableElement) element;
+            TypeElement typeElement = (TypeElement) element.getEnclosingElement();
+
+            /*类的绝对路径 全类名*/
+            String qualifiedName = typeElement.getQualifiedName().toString();
+
+            /*类名*/
+            String clsName = typeElement.getSimpleName().toString();
+            /*获取包名*/
+            String packageName = elementUtils
+                    .getPackageOf(typeElement).getQualifiedName().toString();
+
+            List<String> ids = new ArrayList<>();
+            for (String value : values) {
+                String[] split = value.split("\\.");
+                String id = split[split.length - 1];
+                ids.add(id);
+            }
+
+            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
+            if (javaFileInfo == null) {
+                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
+                specs.put(qualifiedName, javaFileInfo);
+            }
+
+            javaFileInfo.onClickMethodMap.add(new MethodInfo(ids, fast, executableElement));
+        }
+    }
+
+    //获取BindViews注解的所有信息
+    private static void parseBindViews(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
+        Set<? extends Element> bindViews = roundEnv.getElementsAnnotatedWith(BindViews.class);
+        for (Element element : bindViews) {
+            BindViews annotation = element.getAnnotation(BindViews.class);
+
+            //类型
+            TypeMirror typeMirror = element.asType();
+            String type = typeMirror.toString();
+            /*类的绝对路径 全类名*/
+            String eleQualifiedName;
+            /*类名*/
+            String eleClsName;
+            /*获取包名*/
+            String elePackageName;
+
+            DeclaredType paramsType;
+            //获取数组或者集合的参数类型
+            if (typeMirror instanceof ArrayType) {
+                ArrayType arrayType = (ArrayType) typeMirror;
+                TypeMirror componentType = arrayType.getComponentType();
+
+                paramsType = (DeclaredType) componentType;
+                TypeElement paramsElement = (TypeElement) paramsType.asElement();
+
+                /*类的绝对路径 全类名*/
+                eleQualifiedName = paramsElement.getQualifiedName().toString();
+                /*类名*/
+                eleClsName = paramsElement.getSimpleName().toString();
+                /*获取包名*/
+                elePackageName = elementUtils
+                        .getPackageOf(paramsElement).getQualifiedName().toString();
+
+
+            } else if (typeMirror instanceof DeclaredType) {
+                DeclaredType declaredType = (DeclaredType) typeMirror;
+                List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
+
+                if (typeArguments.isEmpty()) continue;
+
+                TypeMirror componentType = typeArguments.get(0);
+                paramsType = (DeclaredType) componentType;
+                TypeElement paramsElement = (TypeElement) paramsType.asElement();
+
+                /*类的绝对路径 全类名*/
+                eleQualifiedName = paramsElement.getQualifiedName().toString();
+                /*类名*/
+                eleClsName = paramsElement.getSimpleName().toString();
+                /*获取包名*/
+                elePackageName = elementUtils
+                        .getPackageOf(paramsElement).getQualifiedName().toString();
+            } else {
+                continue;
+            }
+
+
+            ViewsType viewsType;
+
+            Matcher listMatcher = patterListViews.matcher(type);
+            Matcher collectMatcher = patterCollectionViews.matcher(type);
+            Matcher arrayListMatcher = patterArrayListViews.matcher(type);
+            Matcher linkedListMatcher = patterLinkedListViews.matcher(type);
+            Matcher arrayMatcher = patterArrayViews.matcher(type);
+
+            if (listMatcher.matches()) {
+                viewsType = ViewsType.ArrayList;
+            } else if (collectMatcher.matches()) {
+                viewsType = ViewsType.ArrayList;
+            } else if (arrayListMatcher.matches()) {
+                viewsType = ViewsType.ArrayList;
+            } else if (linkedListMatcher.matches()) {
+                viewsType = ViewsType.LinkedList;
+            } else if (arrayMatcher.matches()) {
+                viewsType = ViewsType.Array;
+            } else {
+                System.out.println("无法获取类型：type======>" + type);
+                continue;
+            }
+
+
+            VariableElement variableElement = (VariableElement) element;
+            TypeElement typeElement = (TypeElement) element.getEnclosingElement();
+
+            /*类的绝对路径 全类名*/
+            String qualifiedName = typeElement.getQualifiedName().toString();
+
+            /*类名*/
+            String clsName = typeElement.getSimpleName().toString();
+            /*获取包名*/
+            String packageName = elementUtils
+                    .getPackageOf(typeElement).getQualifiedName().toString();
+
+            String[] values = annotation.value();
+
+            List<String> ids = new ArrayList<>();
+            for (String value : values) {
+                String[] split = value.split("\\.");
+                String id = split[split.length - 1];
+                ids.add(id);
+            }
+
+
+            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
+            if (javaFileInfo == null) {
+                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
+                specs.put(qualifiedName, javaFileInfo);
+            }
+
+            javaFileInfo.viewsList.add(new ViewsBindInfo(ids, viewsType,
+                    eleQualifiedName, elePackageName, eleClsName, variableElement, paramsType));
+        }
+    }
+
+    //获取BindView注解的所有信息
+    private static void parseBindView(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
+        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(BindView.class);
+        for (Element element : elements) {
+            VariableElement variableElement = (VariableElement) element;
+            //类信息
+            TypeElement typeElement = (TypeElement) variableElement.getEnclosingElement();
+            /*类的绝对路径 全类名*/
+            String qualifiedName = typeElement.getQualifiedName().toString();
+
+            /*类名*/
+            String clsName = typeElement.getSimpleName().toString();
+            /*获取包名*/
+            String packageName = elementUtils
+                    .getPackageOf(typeElement).getQualifiedName().toString();
+
+            BindView annotation = variableElement.getAnnotation(BindView.class);
+            String value = annotation.value();
+            String[] split = value.split("\\.");
+            String id = split[split.length - 1];
+
+            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
+            if (javaFileInfo == null) {
+                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
+                specs.put(qualifiedName, javaFileInfo);
+            }
+            javaFileInfo.javaFileMap.put(id, variableElement);
+        }
+    }
+
 }
