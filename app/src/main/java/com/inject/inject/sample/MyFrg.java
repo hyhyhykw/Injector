@@ -1,4 +1,4 @@
-package com.hyhyhykw.inject;
+package com.inject.inject.sample;
 
 import androidx.fragment.app.Fragment;
 

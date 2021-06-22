@@ -1,11 +1,11 @@
-package com.hyhyhykw.inject.pk;
+package com.inject.inject.sample.pk;
 
 import android.os.Bundle;
 import android.widget.TextView;
 
-import com.hyhyhykw.annotation.BindView;
-import com.hyhyhykw.inject.Inject;
-import com.hyhyhykw.inject.R;
+import com.inject.annotation.BindView;
+import com.inject.inject.sample.R;
+import com.inject.injector.Inject;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -21,10 +21,11 @@ public class Test2Activity extends AppCompatActivity {
     TextView mTv;
     @BindView("btn2")
     TextView mButton;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_test2);
-        Inject.get().inject(this);
+        Inject.inject(this);
     }
 }

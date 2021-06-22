@@ -1,6 +1,8 @@
-package com.hyhyhykw.inject;
+package com.inject.inject.sample;
 
 import android.app.Application;
+
+import com.inject.injector.Inject;
 
 /**
  * Created time : 2021/6/21 9:12.
@@ -13,6 +15,6 @@ public class MyApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        Inject.get().setInjectorIndex(new MyInjectorIndex());
+        Inject.setInjectorIndex(new MyInjectorIndex());
     }
 }

@@ -1,12 +1,13 @@
-package com.hyhyhykw.inject;
+package com.inject.inject.sample;
 
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
 
-import com.hyhyhykw.annotation.BindView;
-import com.hyhyhykw.inject.pk.Test2Activity;
+import com.inject.annotation.BindView;
+import com.inject.inject.sample.pk.Test2Activity;
+import com.inject.injector.Inject;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -26,7 +27,7 @@ public class TestActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_test);
-        Inject.get().inject(this);
+        Inject.inject(this);
 
         mTv.setText("测试Inject2");
         mButton.setOnClickListener(v -> {

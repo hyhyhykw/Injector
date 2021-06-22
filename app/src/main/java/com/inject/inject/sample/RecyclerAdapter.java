@@ -1,4 +1,4 @@
-package com.hyhyhykw.inject;
+package com.inject.inject.sample;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -6,7 +6,8 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 
-import com.hyhyhykw.annotation.BindView;
+import com.inject.annotation.BindView;
+import com.inject.injector.Inject;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -45,7 +46,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.MyView
 
         public MyViewHolder(@NonNull View itemView) {
             super(itemView);
-            Inject.get().inject(this,itemView);
+            Inject.inject(this);
         }
     }
 }

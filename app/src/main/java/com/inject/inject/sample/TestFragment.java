@@ -1,13 +1,12 @@
-package com.hyhyhykw.inject;
+package com.inject.inject.sample;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.TextView;
 
-import com.hyhyhykw.annotation.BindView;
+import com.inject.annotation.OnClick;
+import com.inject.injector.Inject;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,11 +17,6 @@ import androidx.annotation.Nullable;
  * @author 10585
  */
 public class TestFragment extends MyFrg {
-    @BindView("tv1")
-    TextView mTv;
-    @BindView("btn1")
-    Button mButton;
-
 
     @Nullable
     @Override
@@ -34,8 +28,11 @@ public class TestFragment extends MyFrg {
     public void onViewCreated(@NonNull View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Inject.get().inject(this, view);
+        Inject.inject(this);
+    }
 
-        mTv.setText("Fragment Inject");
+    @OnClick({"tv1", "btn1"})
+    void onViewClick(View view) {
+
     }
 }
