@@ -1,5 +1,5 @@
 rootProject.name = "inject"
-include ':app'
+include ':sample'
 include ':annotation'
 include ':compiler'
 include ':injector'

@@ -1,10 +1,32 @@
 package com.inject.compiler;
 
+import com.inject.annotation.BindAnim;
+import com.inject.annotation.BindArray;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
 import com.inject.annotation.Injector;
 import com.inject.annotation.InjectorIndex;
+import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
+import com.inject.annotation.OnLongClick;
+import com.inject.annotation.OnPageChange;
+import com.inject.annotation.OnTextChanged;
+import com.inject.compiler.binder.AnimBinder;
+import com.inject.compiler.binder.ArrayBinder;
+import com.inject.compiler.binder.OnClickBinder;
+import com.inject.compiler.binder.OnPageChangeBinder;
+import com.inject.compiler.binder.OnTextChangeBinder;
+import com.inject.compiler.binder.ViewBinder;
+import com.inject.compiler.binder.ViewsBinder;
+import com.inject.compiler.entity.ArrayInfo;
+import com.inject.compiler.entity.ContextInject;
+import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.IdViewInfo;
+import com.inject.compiler.entity.JavaFileInfo;
+import com.inject.compiler.entity.OnClickMethodInfo;
+import com.inject.compiler.entity.PageChangeInfo;
+import com.inject.compiler.entity.TextChangeInfo;
+import com.inject.compiler.entity.ViewsBindInfo;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -16,15 +38,10 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.WildcardTypeName;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -32,16 +49,17 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
+
+import static com.inject.compiler.Common.getByFullName;
+import static com.inject.compiler.Common.isEmpty;
+import static com.inject.compiler.Common.isNotNeedCast;
 
 /**
  * Created time : 2021/6/20 11:53.
@@ -56,6 +74,10 @@ public class BindProcessor extends AbstractProcessor {
     public static final String OPTION_CUSTOM_INJECT = "myInject";
     public static final String OPTION_CUSTOM_INJECT_METHOD = "injectMethod";
 
+    public static final String OPTION_CONTEXT_INJECT = "contextInject";
+    public static final String OPTION_CONTEXT_INJECT_FIELD = "contextInjectField";
+    public static final String OPTION_CONTEXT_INJECT_METHOD = "contextInjectMethod";
+
     public static final String OPTION_CUSTOM_INJECT_VIEW_FIELD = "injectViewField";
     public static final String OPTION_CUSTOM_INJECT_VIEW_METHOD = "injectViewMethod";
 
@@ -68,21 +90,39 @@ public class BindProcessor extends AbstractProcessor {
         objects.add(OPTION_CUSTOM_INJECT_VIEW_FIELD);
         objects.add(OPTION_CUSTOM_INJECT_VIEW_METHOD);
 
+        objects.add(OPTION_CONTEXT_INJECT);
+        objects.add(OPTION_CONTEXT_INJECT_FIELD);
+        objects.add(OPTION_CONTEXT_INJECT_METHOD);
+
         for (int i = 1; i <= 10; i++) {
             objects.add(OPTION_CUSTOM_INJECT + i);
             objects.add(OPTION_CUSTOM_INJECT_METHOD + i);
             objects.add(OPTION_CUSTOM_INJECT_VIEW_FIELD + i);
             objects.add(OPTION_CUSTOM_INJECT_VIEW_METHOD + i);
+
+            objects.add(OPTION_CONTEXT_INJECT + i);
+            objects.add(OPTION_CONTEXT_INJECT_FIELD + i);
+            objects.add(OPTION_CONTEXT_INJECT_METHOD + i);
         }
+
         return objects;
     }
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         Set<String> types = new HashSet<>();
+        types.add(BindAnim.class.getName());
+        types.add(BindArray.class.getName());
+
         types.add(BindView.class.getName());
         types.add(OnClick.class.getName());
         types.add(BindViews.class.getName());
+        types.add(OnPageChange.class.getName());
+        types.add(OnTextChanged.class.getName());
+
+        types.add(OnCheckedChanged.class.getName());
+        types.add(OnLongClick.class.getName());
+
         return types;
     }
 
@@ -91,12 +131,11 @@ public class BindProcessor extends AbstractProcessor {
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        customInjects = null;
+        contextInjects = null;
         isProcessed = false;
     }
 
-    private boolean isEmpty(String str) {
-        return str == null || str.length() == 0;
-    }
 
     private Set<CustomInject> customInject() {
         String inject = processingEnv.getOptions().get(OPTION_CUSTOM_INJECT);
@@ -136,28 +175,42 @@ public class BindProcessor extends AbstractProcessor {
     }
 
     private Set<CustomInject> customInjects;
+    //对于非context子类 获取context的方法
+    private Set<ContextInject> contextInjects;
 
-    private static final String REGEX_LIST_VIEWS = "java\\.util\\.List<(.+?)>";
-    private static final String REGEX_COLLECTION_VIEWS = "java\\.util\\.Collection<(.+?)>";
-    private static final String REGEX_ARRAYLIST_VIEWS = "java\\.util\\.ArrayList<(.+?)>";
+    private Set<ContextInject> contextInject() {
+        String inject = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT);
 
-    private static final String REGEX_LINKED_VIEWS = "java\\.util\\.LinkedList<(.+?)>";
+        Set<ContextInject> contextInjects = new HashSet<>();
+        if (!isEmpty(inject)) {
+            String contextField = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT_FIELD);
+            String contextMethod = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT_METHOD);
+            if (!isEmpty(contextField) || !isEmpty(contextMethod)) {
+                ContextInject contextInject = new ContextInject(inject, contextMethod, contextField);
+                contextInjects.add(contextInject);
+            }
+        }
+        for (int i = 1; i <= 10; i++) {
+            String injectI = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT + i);
+            if (isEmpty(injectI)) continue;
 
-    private static final String REGEX_ARRAY_VIEWS = "(.+?)\\[]";
+            String contextMethodI = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT_METHOD + i);
+            String contextFieldI = processingEnv.getOptions().get(OPTION_CONTEXT_INJECT_FIELD + i);
 
+            if (isEmpty(contextFieldI) && isEmpty(contextMethodI)) continue;
 
-    private static final Pattern patterListViews = Pattern.compile(REGEX_LIST_VIEWS);
-    private static final Pattern patterCollectionViews = Pattern.compile(REGEX_COLLECTION_VIEWS);
-    private static final Pattern patterArrayListViews = Pattern.compile(REGEX_ARRAYLIST_VIEWS);
+            ContextInject contextInject = new ContextInject(injectI, contextMethodI, contextFieldI);
+            contextInjects.add(contextInject);
+        }
 
-    private static final Pattern patterLinkedListViews = Pattern.compile(REGEX_LINKED_VIEWS);
-
-    private static final Pattern patterArrayViews = Pattern.compile(REGEX_ARRAY_VIEWS);
+        return contextInjects;
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (isProcessed) return false;
         isProcessed = true;
+        contextInjects = contextInject();
         customInjects = customInject();
 
         String pkgName = processingEnv.getOptions().get(OPTION_PKG_NAME);
@@ -167,13 +220,25 @@ public class BindProcessor extends AbstractProcessor {
         Map<String, JavaFileInfo> specs = new HashMap<>();
 
         //获取BindView注解的所有信息
-        parseBindView(roundEnv, elementUtils, specs);
+        ViewBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
         //获取BindViews注解的所有信息
-        parseBindViews(roundEnv, elementUtils, specs);
+        ViewsBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
         //获取OnClick注解的所有信息
-        parseOnClick(roundEnv, elementUtils, specs);
+        OnClickBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取OnPageChange注解的所有信息
+        OnPageChangeBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取OnTextChange注解的所有信息
+        OnTextChangeBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取BindAnim注解的所有信息
+        AnimBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取BindArray注解的所有信息
+        ArrayBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
         try {
             createCode(specs, pkgName, indexName);
@@ -183,32 +248,8 @@ public class BindProcessor extends AbstractProcessor {
         return true;
     }
 
-    private ClassName getByFullName(String fullName, String packageName) {
-        String substring = fullName.replace(packageName, "")
-                .substring(1);
-
-        String[] split = substring.split("\\.");
-        ClassName instance;
-        if (split.length > 1) {
-            String[] strings = new String[split.length - 1];
-
-            for (int i = 0; i < split.length; i++) {
-                if (i == 0) continue;
-                String s = split[i];
-                strings[i - 1] = s;
-            }
-
-            instance = ClassName.get(packageName, split[0], strings);
-        } else {
-            instance = ClassName.get(packageName, substring);
-        }
-
-        return instance;
-    }
-
-    private void createCode(Map<String, JavaFileInfo> specs,
-                            String pkgName,
-                            String indexName) throws Exception {
+    //根据解析出的注解信息创建代码
+    private void createCode(Map<String, JavaFileInfo> specs, String pkgName, String indexName) throws Exception {
         ClassName rCla = ClassName.get(pkgName, "R");
         WildcardTypeName variableName = WildcardTypeName.subtypeOf(Injector.class);
         ParameterizedTypeName parameterizedTypeName = ParameterizedTypeName.get(ClassName.get(Class.class), variableName);
@@ -247,9 +288,13 @@ public class BindProcessor extends AbstractProcessor {
                 }
             }
 
-            Map<String, VariableElement> varMap = value.javaFileMap;
-            Set<MethodInfo> methodMap = value.onClickMethodMap;
+            Map<String, VariableElement> varMap = value.viewIdMap;
+            Map<String, VariableElement> animMap = value.animMap;
+            Set<OnClickMethodInfo> methodMap = value.onClickMethodMap;
             Set<ViewsBindInfo> viewsList = value.viewsList;
+            Set<ArrayInfo> arrayInfo = value.arrayInfo;
+            Set<PageChangeInfo> pageChangeInfo = value.pageChangeInfo;
+            Set<TextChangeInfo> textChangeInfo = value.textChangeInfo;
 
             ClassName viewClick = ClassName.get("com.inject.injector", "ViewClick");
 
@@ -258,140 +303,30 @@ public class BindProcessor extends AbstractProcessor {
             HashMap<String, IdViewInfo> viewsMap = new HashMap<>();
 
             //BindView
-            for (Map.Entry<String, VariableElement> entry : varMap.entrySet()) {
-                String id = entry.getKey();
-                VariableElement entryValue = entry.getValue();
+            ViewBinder.createCode(rCla, custom, injectBuilder, varMap, viewsMap);
 
-                String name = entryValue.getSimpleName().toString();
-
-                viewsMap.put(id, new IdViewInfo("instance." + name, (DeclaredType) entryValue.asType()));
-
-                if (custom != null) {
-                    if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                        injectBuilder.addStatement("instance.$N = instance.$L($T.id.$L)",
-                                name, custom.method, rCla, id);
-                    } else {
-                        injectBuilder.addStatement("instance.$N = view.findViewById($T.id.$L)",
-                                name, rCla, id);
-                    }
-                } else {
-                    injectBuilder.addStatement("instance.$N = instance.findViewById($T.id.$L)",
-                            name, rCla, id);
-                }
+            //对于需要使用context对象的注解，创建一个context变量
+            if (!animMap.isEmpty() || !arrayInfo.isEmpty()) {
+                createContextField(type, qualifiedName, injectBuilder);
             }
-            injectBuilder.add("\n");
+
+            //BindAnim
+            AnimBinder.createCode(rCla, injectBuilder, animMap);
+
+            //BindArray
+            ArrayBinder.createCode(rCla, injectBuilder, arrayInfo);
+
             //BindViews
-            for (ViewsBindInfo info : viewsList) {
-                List<String> ids = info.ids;
+            ViewsBinder.createCode(rCla, custom, injectBuilder, viewsList, viewsMap);
 
-                VariableElement variableElement = info.variableElement;
-                String varName = variableElement.getSimpleName().toString();
-
-                String eleQualifiedName = info.eleQualifiedName;
-                String elePackageName = info.elePackageName;
-
-                ClassName params = getByFullName(eleQualifiedName, elePackageName);
-
-                ViewsType viewsType = info.type;
-
-                switch (viewsType) {
-                    default:
-                    case ArrayList:
-                        injectBuilder.addStatement("instance.$N = new $T<>()", varName, ClassName.get(ArrayList.class));
-                        break;
-                    case LinkedList:
-                        injectBuilder.addStatement("instance.$N = new $T<>()", varName, ClassName.get(LinkedList.class));
-                        break;
-                    case Array:
-                        injectBuilder.addStatement("instance.$N = new $T[$L]", varName, params, ids.size());
-                        break;
-                }
-
-                for (int i = 0; i < ids.size(); i++) {
-                    String viewId = ids.get(i);
-
-                    IdViewInfo idViewInfo = viewsMap.get(viewId);
-
-                    String viewName;
-                    boolean needCast;
-                    if (idViewInfo == null) {
-                        needCast = false;
-                        viewName = varName + i;
-                        viewsMap.put(viewId, new IdViewInfo(viewName, info.paramsType));
-
-                        if (custom != null) {
-                            if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                                injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
-                                        params, viewName, custom.method, rCla, viewId);
-                            } else {
-                                injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
-                                        params, viewName, rCla, viewId);
-                            }
-                        } else {
-                            injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$L)",
-                                    params, viewName, rCla, viewId);
-                        }
-                    } else {
-                        viewName = idViewInfo.name;
-                        DeclaredType viewType = idViewInfo.type;
-                        needCast = !isNotNeedCast(eleQualifiedName, viewType);
-                    }
-
-                    switch (viewsType) {
-                        case ArrayList:
-                        case LinkedList:
-                        default:
-                            if (needCast) {
-                                injectBuilder.addStatement("instance.$N.add(($T) $N)",
-                                        varName, params, viewName);
-                            } else {
-                                injectBuilder.addStatement("instance.$N.add($N)",
-                                        varName, viewName);
-                            }
-                            break;
-                        case Array:
-                            if (needCast) {
-                                injectBuilder.addStatement("instance.$N[$L] = ($T) $N",
-                                        varName, i, params, viewName);
-                            } else {
-                                injectBuilder.addStatement("instance.$N[$L] = $N",
-                                        varName, i, viewName);
-                            }
-                            break;
-                    }
-                }
-            }
-            injectBuilder.add("\n");
             //onClick 方法
-            for (MethodInfo info : methodMap) {
-                List<String> ids = info.ids;
-                ExecutableElement methodElement = info.methodElement;
-                String methodName = methodElement.getSimpleName().toString();
+            OnClickBinder.createCode(rCla, custom, injectBuilder, methodMap, viewClick, viewsMap);
 
-                for (String viewId : ids) {
-                    IdViewInfo idViewInfo = viewsMap.get(viewId);
+            //OnPageChange
+            OnPageChangeBinder.createCode(rCla, custom, injectBuilder, pageChangeInfo, viewsMap);
 
-                    if (idViewInfo != null) {
-                        injectBuilder.addStatement("$T.setViewClick($N, $L, instance::$N)",
-                                viewClick, idViewInfo.name, info.fast, methodName);
-                    } else {
-                        if (custom != null) {
-                            if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                                injectBuilder.addStatement("$T.setViewClick(instance.$L($T.id.$L), $L, instance::$N)",
-                                        viewClick, custom.method, rCla, viewId, info.fast, methodName);
-                            } else {
-                                injectBuilder.addStatement("$T.setViewClick(view.findViewById($T.id.$L), $L, instance::$N)",
-                                        viewClick, rCla, viewId, info.fast, methodName);
-                            }
-                        } else {
-                            injectBuilder.addStatement("$T.setViewClick(instance.findViewById($T.id.$L),$L, instance::$N)",
-                                    viewClick, rCla, viewId, info.fast, methodName);
-                        }
-                    }
-
-                }
-            }
-
+            //OnTextChange
+            OnTextChangeBinder.createCode(rCla, custom, injectBuilder, textChangeInfo, viewsMap);
 
             ParameterSpec.Builder param = ParameterSpec.builder(Object.class, "object");
 
@@ -416,7 +351,7 @@ public class BindProcessor extends AbstractProcessor {
 
             javaFile.writeTo(processingEnv.getFiler());
 
-            codeBuilder.addStatement("$N.put($T.class.getName(),$T.class)",
+            codeBuilder.addStatement("$N.put($T.class.getName(), $T.class)",
                     indexField,
                     instance,
                     className);
@@ -441,29 +376,33 @@ public class BindProcessor extends AbstractProcessor {
                 .skipJavaLangImports(true)
                 .build();
 
-
         javaFile.writeTo(processingEnv.getFiler());
     }
 
-    private boolean isNotNeedCast(String qualifiedName, DeclaredType viewType) {
-        TypeElement type = (TypeElement) viewType.asElement();
-        if (qualifiedName.equals(type.getQualifiedName().toString())) {
-            return true;
+    private void createContextField(TypeElement type, String qualifiedName, CodeBlock.Builder injectBuilder) {
+        ContextInject contextInject = getContextCustom(type);
+        boolean isContext = isNotNeedCast("android.content.Context", (DeclaredType) type.asType());
+
+        injectBuilder.add("//get context from $S\n", qualifiedName);
+        ClassName contextCla = ClassName.get("android.content", "Context");
+        if (contextInject != null) {
+            if (!isContext) {
+                if (!isEmpty(contextInject.field)) {
+                    injectBuilder.addStatement("$T context = instance.$N", contextCla, contextInject.field);
+                } else if (!isEmpty(contextInject.method)) {
+                    injectBuilder.addStatement("$T context = instance.$N()", contextCla, contextInject.method);
+                } else {
+                    injectBuilder.addStatement("$T context = ($T) instance", contextCla, contextCla);
+                }
+
+            } else {
+                injectBuilder.addStatement("$T context = instance", contextCla);
+            }
+        } else {
+            if (isContext) {
+                injectBuilder.addStatement("$T context = instance", contextCla);
+            }
         }
-        TypeMirror superclass = type.getSuperclass();
-        TypeKind kind = superclass.getKind();
-        while (kind == TypeKind.DECLARED) {
-            DeclaredType declaredType = (DeclaredType) superclass;
-            TypeElement element = (TypeElement) declaredType.asElement();
-            String className = element.getQualifiedName().toString();
-            if (qualifiedName.equals(className)) return true;
-
-            superclass = element.getSuperclass();
-            kind = superclass.getKind();
-        }
-
-
-        return false;
     }
 
     private CustomInject getCustom(TypeElement type) {
@@ -484,187 +423,26 @@ public class BindProcessor extends AbstractProcessor {
             kind = superclass.getKind();
         }
         return null;
-
     }
 
-    //获取OnClick注解的所有信息
-    private static void parseOnClick(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
-        Set<? extends Element> onClicks = roundEnv.getElementsAnnotatedWith(OnClick.class);
-        for (Element element : onClicks) {
-            OnClick onClick = element.getAnnotation(OnClick.class);
-            String[] values = onClick.value();
-            boolean fast = onClick.fast();
+    private ContextInject getContextCustom(TypeElement type) {
+        if (contextInjects == null || contextInjects.isEmpty()) return null;
 
-            ExecutableElement executableElement = (ExecutableElement) element;
-            TypeElement typeElement = (TypeElement) element.getEnclosingElement();
+        TypeMirror superclass = type.getSuperclass();
+        TypeKind kind = superclass.getKind();
+        while (kind == TypeKind.DECLARED) {
+            DeclaredType declaredType = (DeclaredType) superclass;
+            TypeElement element = (TypeElement) declaredType.asElement();
 
-            /*类的绝对路径 全类名*/
-            String qualifiedName = typeElement.getQualifiedName().toString();
-
-            /*类名*/
-            String clsName = typeElement.getSimpleName().toString();
-            /*获取包名*/
-            String packageName = elementUtils
-                    .getPackageOf(typeElement).getQualifiedName().toString();
-
-            List<String> ids = new ArrayList<>();
-            for (String value : values) {
-                String[] split = value.split("\\.");
-                String id = split[split.length - 1];
-                ids.add(id);
+            String className = element.getQualifiedName().toString();
+            for (ContextInject inject : contextInjects) {
+                if (inject.claName.equals(className)) return inject;
             }
 
-            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
-            if (javaFileInfo == null) {
-                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
-                specs.put(qualifiedName, javaFileInfo);
-            }
-
-            javaFileInfo.onClickMethodMap.add(new MethodInfo(ids, fast, executableElement));
+            superclass = element.getSuperclass();
+            kind = superclass.getKind();
         }
-    }
-
-    //获取BindViews注解的所有信息
-    private static void parseBindViews(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
-        Set<? extends Element> bindViews = roundEnv.getElementsAnnotatedWith(BindViews.class);
-        for (Element element : bindViews) {
-            BindViews annotation = element.getAnnotation(BindViews.class);
-
-            //类型
-            TypeMirror typeMirror = element.asType();
-            String type = typeMirror.toString();
-            /*类的绝对路径 全类名*/
-            String eleQualifiedName;
-            /*类名*/
-            String eleClsName;
-            /*获取包名*/
-            String elePackageName;
-
-            DeclaredType paramsType;
-            //获取数组或者集合的参数类型
-            if (typeMirror instanceof ArrayType) {
-                ArrayType arrayType = (ArrayType) typeMirror;
-                TypeMirror componentType = arrayType.getComponentType();
-
-                paramsType = (DeclaredType) componentType;
-                TypeElement paramsElement = (TypeElement) paramsType.asElement();
-
-                /*类的绝对路径 全类名*/
-                eleQualifiedName = paramsElement.getQualifiedName().toString();
-                /*类名*/
-                eleClsName = paramsElement.getSimpleName().toString();
-                /*获取包名*/
-                elePackageName = elementUtils
-                        .getPackageOf(paramsElement).getQualifiedName().toString();
-
-
-            } else if (typeMirror instanceof DeclaredType) {
-                DeclaredType declaredType = (DeclaredType) typeMirror;
-                List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
-
-                if (typeArguments.isEmpty()) continue;
-
-                TypeMirror componentType = typeArguments.get(0);
-                paramsType = (DeclaredType) componentType;
-                TypeElement paramsElement = (TypeElement) paramsType.asElement();
-
-                /*类的绝对路径 全类名*/
-                eleQualifiedName = paramsElement.getQualifiedName().toString();
-                /*类名*/
-                eleClsName = paramsElement.getSimpleName().toString();
-                /*获取包名*/
-                elePackageName = elementUtils
-                        .getPackageOf(paramsElement).getQualifiedName().toString();
-            } else {
-                continue;
-            }
-
-
-            ViewsType viewsType;
-
-            Matcher listMatcher = patterListViews.matcher(type);
-            Matcher collectMatcher = patterCollectionViews.matcher(type);
-            Matcher arrayListMatcher = patterArrayListViews.matcher(type);
-            Matcher linkedListMatcher = patterLinkedListViews.matcher(type);
-            Matcher arrayMatcher = patterArrayViews.matcher(type);
-
-            if (listMatcher.matches()) {
-                viewsType = ViewsType.ArrayList;
-            } else if (collectMatcher.matches()) {
-                viewsType = ViewsType.ArrayList;
-            } else if (arrayListMatcher.matches()) {
-                viewsType = ViewsType.ArrayList;
-            } else if (linkedListMatcher.matches()) {
-                viewsType = ViewsType.LinkedList;
-            } else if (arrayMatcher.matches()) {
-                viewsType = ViewsType.Array;
-            } else {
-                System.out.println("无法获取类型：type======>" + type);
-                continue;
-            }
-
-
-            VariableElement variableElement = (VariableElement) element;
-            TypeElement typeElement = (TypeElement) element.getEnclosingElement();
-
-            /*类的绝对路径 全类名*/
-            String qualifiedName = typeElement.getQualifiedName().toString();
-
-            /*类名*/
-            String clsName = typeElement.getSimpleName().toString();
-            /*获取包名*/
-            String packageName = elementUtils
-                    .getPackageOf(typeElement).getQualifiedName().toString();
-
-            String[] values = annotation.value();
-
-            List<String> ids = new ArrayList<>();
-            for (String value : values) {
-                String[] split = value.split("\\.");
-                String id = split[split.length - 1];
-                ids.add(id);
-            }
-
-
-            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
-            if (javaFileInfo == null) {
-                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
-                specs.put(qualifiedName, javaFileInfo);
-            }
-
-            javaFileInfo.viewsList.add(new ViewsBindInfo(ids, viewsType,
-                    eleQualifiedName, elePackageName, eleClsName, variableElement, paramsType));
-        }
-    }
-
-    //获取BindView注解的所有信息
-    private static void parseBindView(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
-        Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(BindView.class);
-        for (Element element : elements) {
-            VariableElement variableElement = (VariableElement) element;
-            //类信息
-            TypeElement typeElement = (TypeElement) variableElement.getEnclosingElement();
-            /*类的绝对路径 全类名*/
-            String qualifiedName = typeElement.getQualifiedName().toString();
-
-            /*类名*/
-            String clsName = typeElement.getSimpleName().toString();
-            /*获取包名*/
-            String packageName = elementUtils
-                    .getPackageOf(typeElement).getQualifiedName().toString();
-
-            BindView annotation = variableElement.getAnnotation(BindView.class);
-            String value = annotation.value();
-            String[] split = value.split("\\.");
-            String id = split[split.length - 1];
-
-            JavaFileInfo javaFileInfo = specs.get(qualifiedName);
-            if (javaFileInfo == null) {
-                javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
-                specs.put(qualifiedName, javaFileInfo);
-            }
-            javaFileInfo.javaFileMap.put(id, variableElement);
-        }
+        return null;
     }
 
 }

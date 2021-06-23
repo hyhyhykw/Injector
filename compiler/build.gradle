@@ -12,4 +12,4 @@ dependencies {
 }
 
 apply plugin: 'com.github.dcendents.android-maven' // 添加这个
-group='com.github.hyhyhykw'	// 指定group，com.github.<用户名>
+group = 'com.github.hyhyhykw'    // 指定group，com.github.<用户名>
