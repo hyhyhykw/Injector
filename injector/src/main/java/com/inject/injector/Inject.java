@@ -2,8 +2,8 @@ package com.inject.injector;
 
 import android.view.View;
 
-import com.inject.annotation.Injector;
-import com.inject.annotation.InjectorIndex;
+import com.inject.index.Injector;
+import com.inject.index.InjectorIndex;
 
 import androidx.fragment.app.Fragment;
 

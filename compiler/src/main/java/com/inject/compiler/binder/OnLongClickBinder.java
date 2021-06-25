@@ -1,6 +1,6 @@
 package com.inject.compiler.binder;
 
-import com.inject.annotation.OnClick;
+import com.inject.annotation.OnLongClick;
 import com.inject.compiler.entity.CustomInject;
 import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
@@ -25,23 +25,20 @@ import static com.inject.compiler.Common.isEmpty;
 
 /**
  * Created time : 2021/6/23 8:40.
- * 获取OnClick注解的所有信息
- * 创建OnClick代码
+ * 获取OnLongClick注解的所有信息
+ * 创建OnLongClick代码
  *
  * @author 10585
- * @see OnClick
+ * @see OnLongClick
  */
-public final class OnClickBinder {
+public final class OnLongClickBinder {
 
-    //获取OnClick注解的所有信息
-    public static void parseAnnotation(RoundEnvironment roundEnv,
-                                       Elements elementUtils,
-                                       Map<String, JavaFileInfo> specs) {
-        Set<? extends Element> onClicks = roundEnv.getElementsAnnotatedWith(OnClick.class);
+    //获取OnLongClick注解的所有信息
+    public static void parseAnnotation(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
+        Set<? extends Element> onClicks = roundEnv.getElementsAnnotatedWith(OnLongClick.class);
         for (Element element : onClicks) {
-            OnClick onClick = element.getAnnotation(OnClick.class);
+            OnLongClick onClick = element.getAnnotation(OnLongClick.class);
             String[] values = onClick.value();
-            boolean fast = onClick.fast();
 
             ExecutableElement executableElement = (ExecutableElement) element;
             TypeElement typeElement = (TypeElement) element.getEnclosingElement();
@@ -59,7 +56,6 @@ public final class OnClickBinder {
             for (String value : values) {
                 String[] split = value.split("\\.");
                 String id = split[split.length - 1];
-
                 boolean isAndroidRes = split[0].equals("android");
                 IdEntity idEntity = new IdEntity(id, isAndroidRes);
                 ids.add(idEntity);
@@ -71,22 +67,20 @@ public final class OnClickBinder {
                 specs.put(qualifiedName, javaFileInfo);
             }
 
-            javaFileInfo.onClickMethodMap.add(new SingleMethodInfo(ids, fast, executableElement));
+            javaFileInfo.longClickMethodMap.add(new SingleMethodInfo(ids, false, executableElement));
         }
     }
 
-    //创建OnClick代码
+    //创建OnLongClick代码
     public static void createCode(ClassName rCla, CustomInject custom,
                                   CodeBlock.Builder injectBuilder,
-                                  Set<SingleMethodInfo> methodMap,
-                                  ClassName viewClick,
+                                  Set<SingleMethodInfo> methodMap, ClassName viewClick,
                                   HashMap<IdEntity, IdViewInfo> viewsMap) {
         if (!methodMap.isEmpty()) {
-            injectBuilder.add("/**\n * generate code by annotation OnClick {@link com.inject.annotation.OnClick}\n */\n");
+            injectBuilder.add("/**\n * generate code by annotation OnLongClick {@link com.inject.annotation.OnLongClick}\n */\n");
         }
 
         for (SingleMethodInfo info : methodMap) {
-//            List<String> ids = info.ids;
             List<IdEntity> idEntities = info.ids;
             ExecutableElement methodElement = info.methodElement;
             String methodName = methodElement.getSimpleName().toString();
@@ -95,40 +89,40 @@ public final class OnClickBinder {
                 IdViewInfo idViewInfo = viewsMap.get(idEntity);
 
                 if (idViewInfo != null) {
-                    injectBuilder.addStatement("$T.setViewClick($N, $L, instance::$N)",
-                            viewClick, idViewInfo.name, info.fast, methodName);
+                    injectBuilder.addStatement("$T.setViewLongClick($N, instance::$N)",
+                            viewClick, idViewInfo.name, methodName);
                 } else {
                     boolean isAndroidRes = idEntity.isAndroidRes;
                     String id = idEntity.id;
+
                     if (custom != null) {
                         if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
                             if (isAndroidRes) {
-                                injectBuilder.addStatement("$T.setViewClick(instance.$L(android.R.id.$L), $L, instance::$N)",
-                                        viewClick, custom.method, id, info.fast, methodName);
+                                injectBuilder.addStatement("$T.setViewLongClick(instance.$L(android.R.id.$L), instance::$N)",
+                                        viewClick, custom.method, id, methodName);
                             } else {
-                                injectBuilder.addStatement("$T.setViewClick(instance.$L($T.id.$L), $L, instance::$N)",
-                                        viewClick, custom.method, rCla, id, info.fast, methodName);
+                                injectBuilder.addStatement("$T.setViewLongClick(instance.$L($T.id.$L), instance::$N)",
+                                        viewClick, custom.method, rCla, id, methodName);
                             }
                         } else {
                             if (isAndroidRes) {
-                                injectBuilder.addStatement("$T.setViewClick(view.findViewById(android.R.id.$L), $L, instance::$N)",
-                                        viewClick, id, info.fast, methodName);
+                                injectBuilder.addStatement("$T.setViewLongClick(view.findViewById(android.R.id.$L), instance::$N)",
+                                        viewClick, id, methodName);
                             } else {
-                                injectBuilder.addStatement("$T.setViewClick(view.findViewById($T.id.$L), $L, instance::$N)",
-                                        viewClick, rCla, id, info.fast, methodName);
+                                injectBuilder.addStatement("$T.setViewLongClick(view.findViewById($T.id.$L), instance::$N)",
+                                        viewClick, rCla, id, methodName);
                             }
                         }
                     } else {
                         if (isAndroidRes) {
-                            injectBuilder.addStatement("$T.setViewClick(instance.findViewById(android.R.id.$L),$L, instance::$N)",
-                                    viewClick, id, info.fast, methodName);
+                            injectBuilder.addStatement("$T.setViewLongClick(instance.findViewById(android.R.id.$L), instance::$N)",
+                                    viewClick, id, methodName);
                         } else {
-                            injectBuilder.addStatement("$T.setViewClick(instance.findViewById($T.id.$L),$L, instance::$N)",
-                                    viewClick, rCla, id, info.fast, methodName);
+                            injectBuilder.addStatement("$T.setViewLongClick(instance.findViewById($T.id.$L), instance::$N)",
+                                    viewClick, rCla, id, methodName);
                         }
                     }
                 }
-
             }
         }
         if (!viewsMap.isEmpty()) {

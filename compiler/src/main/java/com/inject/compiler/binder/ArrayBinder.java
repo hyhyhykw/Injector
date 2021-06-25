@@ -2,6 +2,7 @@ package com.inject.compiler.binder;
 
 import com.inject.annotation.BindArray;
 import com.inject.compiler.entity.ArrayInfo;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.inject.compiler.entity.ViewsType;
 import com.squareup.javapoet.ClassName;
@@ -141,8 +142,10 @@ public final class ArrayBinder {
                 javaFileInfo = new JavaFileInfo(qualifiedName, packageName, clsName, typeElement);
                 specs.put(qualifiedName, javaFileInfo);
             }
+            boolean isAndroidRes = split[0].equals("android");
+            IdEntity idEntity = new IdEntity(id, isAndroidRes);
 
-            javaFileInfo.arrayInfo.add(new ArrayInfo(id, viewsType,
+            javaFileInfo.arrayInfo.add(new ArrayInfo(idEntity, viewsType,
                     eleQualifiedName, elePackageName, eleClsName, variableElement, paramsType));
         }
     }
@@ -154,7 +157,9 @@ public final class ArrayBinder {
         }
         int i = 0;
         for (ArrayInfo info : arrayInfo) {
-            String id = info.id;
+            IdEntity idEntity = info.id;
+            String id = idEntity.id;
+            boolean isAndroidRes = idEntity.isAndroidRes;
 
             VariableElement variableElement = info.variableElement;
             String varName = variableElement.getSimpleName().toString();
@@ -167,12 +172,20 @@ public final class ArrayBinder {
             ViewsType viewsType = info.type;
 
             if (eleQualifiedName.equals("java.lang.String") && viewsType == ViewsType.Array) {
-                injectBuilder.addStatement("instance.$N = context.getResources().getStringArray($T.array.$N)", varName, rCla, id);
+                if (isAndroidRes) {
+                    injectBuilder.addStatement("instance.$N = context.getResources().getStringArray(android.R.array.$N)", varName, id);
+                } else {
+                    injectBuilder.addStatement("instance.$N = context.getResources().getStringArray($T.array.$N)", varName, rCla, id);
+                }
                 continue;
             }
-
-            injectBuilder.addStatement("String[] array$L = context.getResources().getStringArray($T.array.$N)",
-                    i, rCla, id);
+            if (isAndroidRes) {
+                injectBuilder.addStatement("String[] array$L = context.getResources().getStringArray(android.R.array.$N)",
+                        i, id);
+            } else {
+                injectBuilder.addStatement("String[] array$L = context.getResources().getStringArray($T.array.$N)",
+                        i, rCla, id);
+            }
 
             ClassName listClass = null;
             switch (viewsType) {

@@ -1,6 +1,8 @@
 package com.inject.injector;
 
 import android.view.View;
+import android.widget.CompoundButton;
+import android.widget.RadioGroup;
 
 import androidx.annotation.Nullable;
 
@@ -23,6 +25,54 @@ public final class ViewClick {
         lastClickTime = time;
 
         return false;
+    }
+
+    /**
+     * 视图长按点击事件的封装 null处理，防止崩溃
+     *
+     * @param view     视图
+     * @param listener 点击事件
+     */
+    public static void setViewLongClick(@Nullable View view,
+                                    @Nullable final View.OnLongClickListener listener) {
+        if (null == view) return;
+        if (null == listener) {
+            view.setOnLongClickListener(null);
+            return;
+        }
+        view.setOnLongClickListener(listener);
+    }
+
+    /**
+     * checkedChange事件的封装 null处理，防止崩溃
+     *
+     * @param view     视图
+     * @param listener 点击事件
+     */
+    public static void setCheckedChange(@Nullable RadioGroup view,
+                                    @Nullable final RadioGroup.OnCheckedChangeListener listener) {
+        if (null == view) return;
+        if (null == listener) {
+            view.setOnCheckedChangeListener(null);
+            return;
+        }
+        view.setOnCheckedChangeListener(listener);
+    }
+
+    /**
+     * checkedChange事件的封装 null处理，防止崩溃
+     *
+     * @param view     视图
+     * @param listener 点击事件
+     */
+    public static void setCheckedChange(@Nullable CompoundButton view,
+                                    @Nullable final CompoundButton.OnCheckedChangeListener listener) {
+        if (null == view) return;
+        if (null == listener) {
+            view.setOnCheckedChangeListener(null);
+            return;
+        }
+        view.setOnCheckedChangeListener(listener);
     }
 
     /**

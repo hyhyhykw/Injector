@@ -2,6 +2,7 @@ package com.inject.compiler.binder;
 
 import com.inject.annotation.BindViews;
 import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.inject.compiler.entity.ViewsBindInfo;
@@ -45,7 +46,7 @@ import static com.inject.compiler.Common.patterListViews;
 public final class ViewsBinder {
 
     //获取BindViews注解的所有信息
-    public  static void parseAnnotation(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
+    public static void parseAnnotation(RoundEnvironment roundEnv, Elements elementUtils, Map<String, JavaFileInfo> specs) {
         Set<? extends Element> bindViews = roundEnv.getElementsAnnotatedWith(BindViews.class);
         for (Element element : bindViews) {
             BindViews annotation = element.getAnnotation(BindViews.class);
@@ -138,11 +139,14 @@ public final class ViewsBinder {
 
             String[] values = annotation.value();
 
-            List<String> ids = new ArrayList<>();
+            List<IdEntity> ids = new ArrayList<>();
             for (String value : values) {
                 String[] split = value.split("\\.");
                 String id = split[split.length - 1];
-                ids.add(id);
+
+                boolean isAndroidRes = split[0].equals("android");
+                IdEntity idEntity = new IdEntity(id, isAndroidRes);
+                ids.add(idEntity);
             }
 
 
@@ -158,12 +162,14 @@ public final class ViewsBinder {
     }
 
     //创建BindViews代码
-    public  static void createCode(ClassName rCla, CustomInject custom, CodeBlock.Builder injectBuilder, Set<ViewsBindInfo> viewsList, HashMap<String, IdViewInfo> viewsMap) {
+    public static void createCode(ClassName rCla, CustomInject custom,
+                                  CodeBlock.Builder injectBuilder,
+                                  Set<ViewsBindInfo> viewsList, HashMap<IdEntity, IdViewInfo> viewsMap) {
         if (!viewsList.isEmpty()) {
             injectBuilder.add("/**\n * generate code by annotation BindViews {@link com.inject.annotation.BindViews}\n */\n");
         }
         for (ViewsBindInfo info : viewsList) {
-            List<String> ids = info.ids;
+            List<IdEntity> ids = info.ids;
 
             VariableElement variableElement = info.variableElement;
             String varName = variableElement.getSimpleName().toString();
@@ -189,28 +195,47 @@ public final class ViewsBinder {
             }
 
             for (int i = 0; i < ids.size(); i++) {
-                String viewId = ids.get(i);
+                IdEntity idEntity = ids.get(i);
+                String viewId = idEntity.id;
+                boolean isAndroidRes = idEntity.isAndroidRes;
 
-                IdViewInfo idViewInfo = viewsMap.get(viewId);
+                IdViewInfo idViewInfo = viewsMap.get(idEntity);
 
                 String viewName;
                 boolean needCast;
                 if (idViewInfo == null) {
                     needCast = false;
                     viewName = varName + i;
-                    viewsMap.put(viewId, new IdViewInfo(viewName, info.paramsType));
+                    viewsMap.put(idEntity, new IdViewInfo(viewName, info.paramsType));
 
                     if (custom != null) {
                         if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                            injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
-                                    params, viewName, custom.method, rCla, viewId);
+                            if (isAndroidRes) {
+                                injectBuilder.addStatement("$T $N = instance.$L(android.R.id.$L)",
+                                        params, viewName, custom.method, viewId);
+                            } else {
+                                injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
+                                        params, viewName, custom.method, rCla, viewId);
+                            }
                         } else {
-                            injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
-                                    params, viewName, rCla, viewId);
+                            if (isAndroidRes) {
+                                injectBuilder.addStatement("$T $N = view.findViewById(android.R.id.$L)",
+                                        params, viewName, viewId);
+                            } else {
+                                injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
+                                        params, viewName, rCla, viewId);
+                            }
                         }
                     } else {
-                        injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$L)",
-                                params, viewName, rCla, viewId);
+                        if (isAndroidRes) {
+                            injectBuilder.addStatement("$T $N = instance.findViewById(android.R.id.$L)",
+                                    params, viewName, viewId);
+
+                        } else {
+                            injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$L)",
+                                    params, viewName, rCla, viewId);
+
+                        }
                     }
                 } else {
                     viewName = idViewInfo.name;

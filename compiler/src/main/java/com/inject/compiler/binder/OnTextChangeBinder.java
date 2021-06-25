@@ -3,6 +3,7 @@ package com.inject.compiler.binder;
 import com.inject.annotation.OnTextChanged;
 import com.inject.compiler.Common;
 import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.inject.compiler.entity.TextChangeInfo;
@@ -58,11 +59,14 @@ public final class OnTextChangeBinder {
             String packageName = elementUtils
                     .getPackageOf(typeElement).getQualifiedName().toString();
 
-            List<String> ids = new ArrayList<>();
+            List<IdEntity> ids = new ArrayList<>();
             for (String value : values) {
                 String[] split = value.split("\\.");
                 String id = split[split.length - 1];
-                ids.add(id);
+
+                boolean isAndroidRes = split[0].equals("android");
+                IdEntity idEntity = new IdEntity(id, isAndroidRes);
+                ids.add(idEntity);
             }
 
             JavaFileInfo javaFileInfo = specs.get(qualifiedName);
@@ -80,7 +84,7 @@ public final class OnTextChangeBinder {
                                   CustomInject custom,
                                   CodeBlock.Builder injectBuilder,
                                   Set<TextChangeInfo> pageChangeInfo,
-                                  HashMap<String, IdViewInfo> viewsMap) {
+                                  HashMap<IdEntity, IdViewInfo> viewsMap) {
         if (!pageChangeInfo.isEmpty()) {
             injectBuilder.add("/**\n * generate code by annotation OnTextChanged {@link com.inject.annotation.OnTextChanged}\n */\n");
         }
@@ -88,22 +92,22 @@ public final class OnTextChangeBinder {
         ClassName textView = ClassName.get("android.widget", "TextView");
         ClassName onTextChangeListener = ClassName.get("com.inject.injector", "TextChangeListener");
 
-        Map<String, String> idViewNames = new TreeMap<>();
-        Map<List<String>, TypeSpec.Builder> idListeners = new HashMap<>();
+        Map<IdEntity, String> idViewNames = new TreeMap<>((o1, o2) -> o1.id.compareTo(o2.id));
+        Map<List<IdEntity>, TypeSpec.Builder> idListeners = new HashMap<>();
 
         int index = 0;
         for (TextChangeInfo info : pageChangeInfo) {
-            List<String> ids = info.ids;
+            List<IdEntity> ids = info.ids;
 
             OnTextChanged.Listen listen = info.listen;
             ExecutableElement methodElement = info.methodElement;
             String methodName = methodElement.getSimpleName().toString();
 
-            for (String id : ids) {
-                String viewName = idViewNames.get(id);
+            for (IdEntity idEntity : ids) {
+                String viewName = idViewNames.get(idEntity);
                 if (Common.isEmpty(viewName)) {
                     viewName = "textView" + index;
-                    IdViewInfo viewInfo = viewsMap.get(id);
+                    IdViewInfo viewInfo = viewsMap.get(idEntity);
                     if (viewInfo != null) {
                         if (Common.isNotNeedCast("android.widget.TextView", viewInfo.type)) {
                             injectBuilder.addStatement("$T $N = $N", textView, viewName, viewInfo.name);
@@ -111,21 +115,39 @@ public final class OnTextChangeBinder {
                             injectBuilder.addStatement("$T $N = ($T) $N", textView, viewName, textView, viewInfo.name);
                         }
                     } else {
+                        boolean isAndroidRes = idEntity.isAndroidRes;
+                        String id = idEntity.id;
+
                         if (custom == null) {
-                            injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$N)",
-                                    textView, viewName, rCla, id);
+                            if (isAndroidRes) {
+                                injectBuilder.addStatement("$T $N = instance.findViewById(android.R.id.$N)",
+                                        textView, viewName, id);
+                            } else {
+                                injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$N)",
+                                        textView, viewName, rCla, id);
+                            }
                         } else {
                             if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                                injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
-                                        textView, viewName, custom.method, rCla, id);
+                                if (isAndroidRes) {
+                                    injectBuilder.addStatement("$T $N = instance.$L(android.R.id.$L)",
+                                            textView, viewName, custom.method, id);
+                                } else {
+                                    injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
+                                            textView, viewName, custom.method, rCla, id);
+                                }
                             } else {
-                                injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
-                                        textView, viewName, rCla, id);
+                                if (isAndroidRes) {
+                                    injectBuilder.addStatement("$T $N = view.findViewById(android.R.id.$L)",
+                                            textView, viewName, id);
+                                } else {
+                                    injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
+                                            textView, viewName, rCla, id);
+                                }
                             }
                         }
 
                     }
-                    idViewNames.put(id, viewName);
+                    idViewNames.put(idEntity, viewName);
                     index++;
                 }
             }
@@ -186,23 +208,19 @@ public final class OnTextChangeBinder {
         }
 
         int i = 0;
-        for (Map.Entry<List<String>, TypeSpec.Builder> entry : idListeners.entrySet()) {
-            List<String> ids = entry.getKey();
+        for (Map.Entry<List<IdEntity>, TypeSpec.Builder> entry : idListeners.entrySet()) {
+            List<IdEntity> ids = entry.getKey();
             TypeSpec.Builder builder = entry.getValue();
 //            FieldSpec.Builder initializer = FieldSpec.builder(onTextChangeListener, "textChangeListener" + i)
 //                    .initializer("$L", builder.build());
 
             injectBuilder.addStatement("$T textChangeListener$L = $L", onTextChangeListener, i, builder.build());
-            for (String id : ids) {
+            for (IdEntity id : ids) {
                 String viewName = idViewNames.get(id);
                 injectBuilder.addStatement("$N.addTextChangedListener(textChangeListener$L)", viewName, i);
             }
 
             i++;
-            injectBuilder.add("\n");
-        }
-
-        if (pageChangeInfo.isEmpty()) {
             injectBuilder.add("\n");
         }
     }

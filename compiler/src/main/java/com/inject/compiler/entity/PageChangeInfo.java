@@ -10,11 +10,11 @@ import javax.lang.model.element.ExecutableElement;
  * @author 10585
  */
 public final class PageChangeInfo {
-    public final String id;
+    public final IdEntity id;
     public final OnPageChange.Listen listen;
     public final ExecutableElement methodElement;
 
-    public PageChangeInfo(String id, OnPageChange.Listen listen, ExecutableElement methodElement) {
+    public PageChangeInfo(IdEntity id, OnPageChange.Listen listen, ExecutableElement methodElement) {
         this.id = id;
         this.listen = listen;
         this.methodElement = methodElement;

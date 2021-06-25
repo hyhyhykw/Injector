@@ -1,4 +1,4 @@
-package com.inject.annotation;
+package com.inject.index;
 
 import java.util.Map;
 
@@ -11,5 +11,10 @@ import java.util.Map;
  */
 public interface InjectorIndex {
 
+    /**
+     * ad
+     *
+     * @return
+     */
     Map<String, Class<? extends Injector>> getIndex();
 }

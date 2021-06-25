@@ -1,4 +1,8 @@
-package com.inject.annotation;
+package com.inject.index;
+
+import com.inject.annotation.BindView;
+import com.inject.annotation.BindViews;
+import com.inject.annotation.OnClick;
 
 /**
  * Created time : 2021/6/21 8:17.

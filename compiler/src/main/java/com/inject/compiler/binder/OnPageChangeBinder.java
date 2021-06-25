@@ -3,6 +3,7 @@ package com.inject.compiler.binder;
 import com.inject.annotation.OnPageChange;
 import com.inject.compiler.Common;
 import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.inject.compiler.entity.PageChangeInfo;
@@ -65,7 +66,9 @@ public final class OnPageChangeBinder {
                 specs.put(qualifiedName, javaFileInfo);
             }
 
-            javaFileInfo.pageChangeInfo.add(new PageChangeInfo(id, listen, executableElement));
+            boolean isAndroidRes = split[0].equals("android");
+            IdEntity idEntity = new IdEntity(id, isAndroidRes);
+            javaFileInfo.pageChangeInfo.add(new PageChangeInfo(idEntity, listen, executableElement));
         }
     }
 
@@ -74,28 +77,31 @@ public final class OnPageChangeBinder {
                                   CustomInject custom,
                                   CodeBlock.Builder injectBuilder,
                                   Set<PageChangeInfo> pageChangeInfo,
-                                  HashMap<String, IdViewInfo> viewsMap) {
+                                  HashMap<IdEntity, IdViewInfo> viewsMap) {
         if (!pageChangeInfo.isEmpty()) {
             injectBuilder.add("/**\n * generate code by annotation OnPageChange {@link com.inject.annotation.OnPageChange}\n */\n");
         }
 
         ClassName viewPager = ClassName.get("androidx.viewpager.widget", "ViewPager");
-        ClassName onPageChangeListener = ClassName.get("com.inject.injector","OnPageChangeListener");
+        ClassName onPageChangeListener = ClassName.get("com.inject.injector", "OnPageChangeListener");
 
-        Map<String, String> idViewNames = new TreeMap<>();
-        Map<String, TypeSpec.Builder> idListeners = new TreeMap<>();
+        Map<IdEntity, String> idViewNames = new TreeMap<>((o1, o2) -> o1.id.compareTo(o2.id));
+        Map<IdEntity, TypeSpec.Builder> idListeners = new TreeMap<>((o1, o2) -> o1.id.compareTo(o2.id));
 
         int index = 0;
         for (PageChangeInfo info : pageChangeInfo) {
-            String id = info.id;
+            IdEntity idEntity = info.id;
+            String id = idEntity.id;
+
+            boolean isAndroidRes = idEntity.isAndroidRes;
             OnPageChange.Listen listen = info.listen;
             ExecutableElement methodElement = info.methodElement;
 
             String methodName = methodElement.getSimpleName().toString();
-            String viewName = idViewNames.get(id);
+            String viewName = idViewNames.get(idEntity);
             if (Common.isEmpty(viewName)) {
                 viewName = "viewPager" + index;
-                IdViewInfo viewInfo = viewsMap.get(id);
+                IdViewInfo viewInfo = viewsMap.get(idEntity);
                 if (viewInfo != null) {
                     if (Common.isNotNeedCast("androidx.viewpager.widget.ViewPager", viewInfo.type)) {
                         injectBuilder.addStatement("$T $N = $N", viewPager, viewName, viewInfo.name);
@@ -104,27 +110,42 @@ public final class OnPageChangeBinder {
                     }
                 } else {
                     if (custom == null) {
-                        injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$N)",
-                                viewPager, viewName, rCla, id);
+                        if (isAndroidRes) {
+                            injectBuilder.addStatement("$T $N = instance.findViewById(android.R.id.$N)",
+                                    viewPager, viewName, id);
+                        } else {
+                            injectBuilder.addStatement("$T $N = instance.findViewById($T.id.$N)",
+                                    viewPager, viewName, rCla, id);
+                        }
                     } else {
                         if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
-                            injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
-                                    viewPager, viewName, custom.method, rCla, id);
+                            if (isAndroidRes) {
+                                injectBuilder.addStatement("$T $N = instance.$L(android.R.id.$L)",
+                                        viewPager, viewName, custom.method, id);
+                            } else {
+                                injectBuilder.addStatement("$T $N = instance.$L($T.id.$L)",
+                                        viewPager, viewName, custom.method, rCla, id);
+                            }
                         } else {
-                            injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
-                                    viewPager, viewName, rCla, id);
+                            if (isAndroidRes) {
+                                injectBuilder.addStatement("$T $N = view.findViewById(android.R.id.$L)",
+                                        viewPager, viewName, id);
+                            } else {
+                                injectBuilder.addStatement("$T $N = view.findViewById($T.id.$L)",
+                                        viewPager, viewName, rCla, id);
+                            }
                         }
                     }
 
                 }
-                idViewNames.put(id, "viewPager" + index);
+                idViewNames.put(idEntity, "viewPager" + index);
                 index++;
             }
-            TypeSpec.Builder onPageChangeListenerBuilder = idListeners.get(id);
+            TypeSpec.Builder onPageChangeListenerBuilder = idListeners.get(idEntity);
             if (onPageChangeListenerBuilder == null) {
                 onPageChangeListenerBuilder = TypeSpec.anonymousClassBuilder("")
                         .addSuperinterface(onPageChangeListener);
-                idListeners.put(id, onPageChangeListenerBuilder);
+                idListeners.put(idEntity, onPageChangeListenerBuilder);
             }
 
             if (listen == OnPageChange.Listen.ON_PAGE_SCROLLED) {
@@ -169,10 +190,10 @@ public final class OnPageChangeBinder {
             }
         }
 
-        for (Map.Entry<String, TypeSpec.Builder> entry : idListeners.entrySet()) {
-            String id = entry.getKey();
-            String viewName = idViewNames.get(id);
-            TypeSpec.Builder onPageChangeListenerBuilder = idListeners.get(id);
+        for (Map.Entry<IdEntity, TypeSpec.Builder> entry : idListeners.entrySet()) {
+            IdEntity idEntity = entry.getKey();
+            String viewName = idViewNames.get(idEntity);
+            TypeSpec.Builder onPageChangeListenerBuilder = idListeners.get(idEntity);
             injectBuilder.addStatement("$N.addOnPageChangeListener($L)", viewName, onPageChangeListenerBuilder.build());
         }
 

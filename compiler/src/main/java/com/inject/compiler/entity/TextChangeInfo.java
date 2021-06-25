@@ -12,11 +12,11 @@ import javax.lang.model.element.ExecutableElement;
  * @author 10585
  */
 public final class TextChangeInfo {
-    public final List<String> ids;
+    public final List<IdEntity> ids;
     public final OnTextChanged.Listen listen;
     public final ExecutableElement methodElement;
 
-    public TextChangeInfo(List<String> ids, OnTextChanged.Listen listen, ExecutableElement methodElement) {
+    public TextChangeInfo(List<IdEntity> ids, OnTextChanged.Listen listen, ExecutableElement methodElement) {
         this.ids = ids;
         this.listen = listen;
         this.methodElement = methodElement;

@@ -3,9 +3,12 @@ package com.inject.inject.sample;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 
 import com.inject.annotation.BindView;
+import com.inject.annotation.OnCheckedChanged;
 import com.inject.inject.sample.pk.Test2Activity;
 import com.inject.injector.Inject;
 
@@ -18,10 +21,12 @@ import androidx.appcompat.app.AppCompatActivity;
  * @author 10585
  */
 public class TestActivity extends AppCompatActivity {
-    @BindView("tv1")
+    @BindView("R.id.tv1")
     TextView mTv;
-    @BindView("btn1")
+    @BindView("R.id.btn1")
     Button mButton;
+    @BindView("android.R.id.checkbox")
+    CheckBox mCheckbox;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -35,4 +40,9 @@ public class TestActivity extends AppCompatActivity {
         });
     }
 
+
+    @OnCheckedChanged({"android.R.id.checkbox"})
+    void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+
+    }
 }

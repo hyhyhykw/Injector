@@ -9,7 +9,7 @@ import javax.lang.model.type.DeclaredType;
  * @author 10585
  */
 public final class ArrayInfo {
-    public final String id;
+    public final IdEntity id;
     public final ViewsType type;
 
     public final String eleQualifiedName;
@@ -19,7 +19,7 @@ public final class ArrayInfo {
     public final VariableElement variableElement;
     public final DeclaredType paramsType;
 
-    public ArrayInfo(String id,
+    public ArrayInfo(IdEntity id,
                      ViewsType type,
                      String eleQualifiedName,
                      String elePackageName,

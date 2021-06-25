@@ -6,13 +6,18 @@ import android.text.Editable;
 import android.view.View;
 import android.view.animation.Animation;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import com.inject.annotation.BindAnim;
 import com.inject.annotation.BindArray;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
+import com.inject.index.CheckChangeType;
+import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
+import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
 import com.inject.injector.Inject;
@@ -63,12 +68,26 @@ public class MainActivity extends AppCompatActivity {
     @BindArray("array3")
     List<CharSequence> array4;
 
+    @BindView("radio")
+    View rgp;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Inject.inject(this);
         mTv.setText("测试Inject");
+    }
+
+
+    @OnCheckedChanged({"checkbox"})
+    void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+
+    }
+
+    @OnCheckedChanged(value = "radio", type = CheckChangeType.RadioGroup)
+    void onCheckedChanged(RadioGroup group, int checkedId) {
+
     }
 
     @OnTextChanged(value = {"tv", "tv1"}, listen = OnTextChanged.Listen.BEFORE_TEXT_CHANGE)
@@ -118,6 +137,12 @@ public class MainActivity extends AppCompatActivity {
                     this, TestActivity.class
             ));
         }
+    }
+
+    @OnLongClick({"tv", "btn", "tv1"})
+    boolean onViewLongClick(View view) {
+
+        return true;
     }
 
     @OnClick({"tv1", "btn1"})

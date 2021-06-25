@@ -1,6 +1,7 @@
 package com.inject.compiler.binder;
 
 import com.inject.annotation.BindAnim;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -51,25 +52,37 @@ public final class AnimBinder {
                 specs.put(qualifiedName, javaFileInfo);
             }
 
-            javaFileInfo.animMap.put(id, variableElement);
+            boolean isAndroidRes = split[0].equals("android");
+            IdEntity idEntity = new IdEntity(id, isAndroidRes);
+            javaFileInfo.animMap.put(idEntity, variableElement);
         }
     }
 
     //创建BindAnim代码
-    public static void createCode(ClassName rCla, CodeBlock.Builder injectBuilder, Map<String, VariableElement> animMap) {
+    public static void createCode(ClassName rCla, CodeBlock.Builder injectBuilder,
+                                  Map<IdEntity, VariableElement> animMap) {
         if (!animMap.isEmpty()) {
             injectBuilder.add("/**\n * generate code by annotation BindAnim {@link com.inject.annotation.BindAnim}\n */\n");
         }
 
         ClassName animationUtils = ClassName.get("android.view.animation", "AnimationUtils");
 
-        for (Map.Entry<String, VariableElement> entry : animMap.entrySet()) {
-            String id = entry.getKey();
+        for (Map.Entry<IdEntity, VariableElement> entry : animMap.entrySet()) {
+            IdEntity idEntity = entry.getKey();
+            boolean isAndroidRes = idEntity.isAndroidRes;
+            String id = idEntity.id;
+
             VariableElement element = entry.getValue();
 
             String name = element.getSimpleName().toString();
-            injectBuilder.addStatement("instance.$N = $T.loadAnimation(context, $T.anim.$N)",
-                    name, animationUtils, rCla, id);
+            if (isAndroidRes) {
+                injectBuilder.addStatement("instance.$N = $T.loadAnimation(context, android.R.anim.$N)",
+                        name, animationUtils, id);
+
+            } else {
+                injectBuilder.addStatement("instance.$N = $T.loadAnimation(context, $T.anim.$N)",
+                        name, animationUtils, rCla, id);
+            }
         }
         if (!animMap.isEmpty()) {
             injectBuilder.add("\n");

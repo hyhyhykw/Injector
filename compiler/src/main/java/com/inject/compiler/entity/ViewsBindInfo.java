@@ -11,7 +11,7 @@ import javax.lang.model.type.DeclaredType;
  * @author 10585
  */
 public final class ViewsBindInfo {
-    public final List<String> ids;
+    public final List<IdEntity> ids;
     public final ViewsType type;
 
     public final String eleQualifiedName;
@@ -21,7 +21,7 @@ public final class ViewsBindInfo {
     public final VariableElement variableElement;
     public final DeclaredType paramsType;
 
-    public ViewsBindInfo(List<String> ids,
+    public ViewsBindInfo(List<IdEntity> ids,
                          ViewsType type,
                          String eleQualifiedName,
                          String elePackageName,

@@ -4,8 +4,8 @@ import com.inject.annotation.BindAnim;
 import com.inject.annotation.BindArray;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
-import com.inject.annotation.Injector;
-import com.inject.annotation.InjectorIndex;
+import com.inject.index.Injector;
+import com.inject.index.InjectorIndex;
 import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
@@ -13,7 +13,9 @@ import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
 import com.inject.compiler.binder.AnimBinder;
 import com.inject.compiler.binder.ArrayBinder;
+import com.inject.compiler.binder.OnCheckedChangeBinder;
 import com.inject.compiler.binder.OnClickBinder;
+import com.inject.compiler.binder.OnLongClickBinder;
 import com.inject.compiler.binder.OnPageChangeBinder;
 import com.inject.compiler.binder.OnTextChangeBinder;
 import com.inject.compiler.binder.ViewBinder;
@@ -21,10 +23,11 @@ import com.inject.compiler.binder.ViewsBinder;
 import com.inject.compiler.entity.ArrayInfo;
 import com.inject.compiler.entity.ContextInject;
 import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
-import com.inject.compiler.entity.OnClickMethodInfo;
 import com.inject.compiler.entity.PageChangeInfo;
+import com.inject.compiler.entity.SingleMethodInfo;
 import com.inject.compiler.entity.TextChangeInfo;
 import com.inject.compiler.entity.ViewsBindInfo;
 import com.squareup.javapoet.ClassName;
@@ -38,6 +41,8 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.WildcardTypeName;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -113,15 +118,13 @@ public class BindProcessor extends AbstractProcessor {
         Set<String> types = new HashSet<>();
         types.add(BindAnim.class.getName());
         types.add(BindArray.class.getName());
-
         types.add(BindView.class.getName());
         types.add(OnClick.class.getName());
         types.add(BindViews.class.getName());
         types.add(OnPageChange.class.getName());
         types.add(OnTextChanged.class.getName());
-
-        types.add(OnCheckedChanged.class.getName());
         types.add(OnLongClick.class.getName());
+        types.add(OnCheckedChanged.class.getName());
 
         return types;
     }
@@ -228,6 +231,12 @@ public class BindProcessor extends AbstractProcessor {
         //获取OnClick注解的所有信息
         OnClickBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
+        //获取OnLongClick注解的所有信息
+        OnLongClickBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取OnCheckChange注解
+        OnCheckedChangeBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
         //获取OnPageChange注解的所有信息
         OnPageChangeBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
@@ -259,10 +268,17 @@ public class BindProcessor extends AbstractProcessor {
                 TypeName.get(String.class), parameterizedTypeName);
 
         FieldSpec.Builder indexMap = FieldSpec.builder(typeName, "INDEX", Modifier.STATIC, Modifier.PRIVATE, Modifier.FINAL)
-                .initializer("new $T<>()", HashMap.class);
+                .initializer("new $T<>()", HashMap.class)
+                .addJavadoc("The injector index");
         FieldSpec indexField = indexMap.build();
 
         CodeBlock.Builder codeBuilder = CodeBlock.builder();
+
+        @SuppressWarnings("SimpleDateFormat")
+        SimpleDateFormat format = new SimpleDateFormat();
+        format.applyPattern("yyyy/MM/dd hh:mm");
+        String dateTime = format.format(new Date());
+
 
         for (JavaFileInfo value : specs.values()) {
             TypeElement type = value.type;
@@ -288,19 +304,19 @@ public class BindProcessor extends AbstractProcessor {
                 }
             }
 
-            Map<String, VariableElement> varMap = value.viewIdMap;
-            Map<String, VariableElement> animMap = value.animMap;
-            Set<OnClickMethodInfo> methodMap = value.onClickMethodMap;
+            Map<IdEntity, VariableElement> varMap = value.viewIdMap;
+            Map<IdEntity, VariableElement> animMap = value.animMap;
+            Set<SingleMethodInfo> methodMap = value.onClickMethodMap;
             Set<ViewsBindInfo> viewsList = value.viewsList;
             Set<ArrayInfo> arrayInfo = value.arrayInfo;
             Set<PageChangeInfo> pageChangeInfo = value.pageChangeInfo;
             Set<TextChangeInfo> textChangeInfo = value.textChangeInfo;
+            Set<SingleMethodInfo> longClickMethodMap = value.longClickMethodMap;
+            Set<SingleMethodInfo> checkedChangedMethodMap = value.checkedChangedMethodMap;
+
 
             ClassName viewClick = ClassName.get("com.inject.injector", "ViewClick");
-
-            injectBuilder.add("\n");
-
-            HashMap<String, IdViewInfo> viewsMap = new HashMap<>();
+            HashMap<IdEntity, IdViewInfo> viewsMap = new HashMap<>();
 
             //BindView
             ViewBinder.createCode(rCla, custom, injectBuilder, varMap, viewsMap);
@@ -322,6 +338,11 @@ public class BindProcessor extends AbstractProcessor {
             //onClick 方法
             OnClickBinder.createCode(rCla, custom, injectBuilder, methodMap, viewClick, viewsMap);
 
+            //onLongClick 方法
+            OnLongClickBinder.createCode(rCla, custom, injectBuilder, longClickMethodMap, viewClick, viewsMap);
+
+            //OnCheckChange
+            OnCheckedChangeBinder.createCode(rCla, custom, injectBuilder, checkedChangedMethodMap, viewClick, viewsMap);
             //OnPageChange
             OnPageChangeBinder.createCode(rCla, custom, injectBuilder, pageChangeInfo, viewsMap);
 
@@ -340,6 +361,12 @@ public class BindProcessor extends AbstractProcessor {
 
             TypeSpec build = TypeSpec.classBuilder(className)
                     .addModifiers(Modifier.FINAL, Modifier.PUBLIC)
+                    .addJavadoc(
+                            "Created time : " + dateTime + ".\nThe injector of " + claName +
+                                    " \n\n@author James\n" +
+                                    "@see com.inject.index.Injector\n" +
+                                    "@see " + packageName + "." + claName
+                    )
                     .addMethod(inject.build())
                     .addSuperinterface(Injector.class)
                     .build();
@@ -360,11 +387,20 @@ public class BindProcessor extends AbstractProcessor {
         MethodSpec.Builder indexMethod = MethodSpec.methodBuilder("getIndex")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
+                .addJavadoc(
+                        "The index of injector class name and the injector\n" +
+                                "\n" +
+                                "@return injector index"
+                )
                 .returns(typeName)
                 .addStatement("return $N", indexField);
 
+
         TypeSpec build = TypeSpec.classBuilder(indexName)
                 .addModifiers(Modifier.FINAL, Modifier.PUBLIC)
+                .addJavadoc(
+                        "Created time : " + dateTime + ".\nAuto Generate Injector Index\n\n@author James\n@see com.inject.index.Injector\n@see com.inject.index.InjectorIndex"
+                )
                 .addField(indexField)
                 .addSuperinterface(InjectorIndex.class)
                 .addMethod(indexMethod.build())
@@ -383,7 +419,7 @@ public class BindProcessor extends AbstractProcessor {
         ContextInject contextInject = getContextCustom(type);
         boolean isContext = isNotNeedCast("android.content.Context", (DeclaredType) type.asType());
 
-        injectBuilder.add("//get context from $S\n", qualifiedName);
+        injectBuilder.add("/**\n * get context from {@link $L}\n */\n", qualifiedName);
         ClassName contextCla = ClassName.get("android.content", "Context");
         if (contextInject != null) {
             if (!isContext) {
@@ -394,13 +430,14 @@ public class BindProcessor extends AbstractProcessor {
                 } else {
                     injectBuilder.addStatement("$T context = ($T) instance", contextCla, contextCla);
                 }
-
             } else {
                 injectBuilder.addStatement("$T context = instance", contextCla);
             }
+            injectBuilder.add("\n");
         } else {
             if (isContext) {
                 injectBuilder.addStatement("$T context = instance", contextCla);
+                injectBuilder.add("\n");
             }
         }
     }
