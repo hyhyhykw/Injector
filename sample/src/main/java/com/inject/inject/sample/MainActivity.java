@@ -1,6 +1,5 @@
 package com.inject.inject.sample;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.view.View;
@@ -14,12 +13,12 @@ import com.inject.annotation.BindAnim;
 import com.inject.annotation.BindArray;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
-import com.inject.index.CheckChangeType;
 import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
+import com.inject.index.CheckChangeType;
 import com.inject.injector.Inject;
 
 import java.util.List;
@@ -80,73 +79,62 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    @OnCheckedChanged({"checkbox"})
-    void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-
-    }
-
-    @OnCheckedChanged(value = "radio", type = CheckChangeType.RadioGroup)
-    void onCheckedChanged(RadioGroup group, int checkedId) {
-
-    }
-
-    @OnTextChanged(value = {"tv", "tv1"}, listen = OnTextChanged.Listen.BEFORE_TEXT_CHANGE)
-    void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
-    }
-
-    @OnTextChanged(value = {"tv"}, listen = OnTextChanged.Listen.ON_TEXT_CHANGE)
-    void onTextChanged(CharSequence s, int start, int before, int count) {
-
-    }
-
-    @OnTextChanged(value = {"tv1"}, listen = OnTextChanged.Listen.AFTER_TEXT_CHANGE)
-    void afterTextChanged(Editable s) {
-
-    }
-
-    @OnPageChange(value = "vpg1", listen = OnPageChange.Listen.ON_PAGE_SELECTED)
-    void onPageSelected(int position) {
-
-    }
-
-    @OnPageChange(value = "vpg1", listen = OnPageChange.Listen.ON_PAGE_SCROLL_STATE_CHANGED)
-    void onPageScrollStateChanged(int state) {
-
-    }
-
-    @OnPageChange(value = "vpg1", listen = OnPageChange.Listen.ON_PAGE_SCROLLED)
-    void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-
-    }
-
-    @OnPageChange(value = "vpg2", listen = OnPageChange.Listen.ON_PAGE_SELECTED)
-    void onPageSelected2(int position) {
-
-    }
-
-    @OnPageChange(value = "vpg2", listen = OnPageChange.Listen.ON_PAGE_SCROLLED)
-    void onPageScrolled2(int position, float positionOffset, int positionOffsetPixels) {
-
-    }
-
-    @OnClick(value = {"tv", "btn", "tv1"}, fast = false)
-    void onViewClick(View view) {
-        if (view.getId() == R.id.btn) {
-            startActivity(new Intent(
-                    this, TestActivity.class
-            ));
+    @OnClick({"R.id.tv", "R.id.btn"})
+    void onViewClicked(View view) {
+        int viewId = view.getId();
+        if (viewId == R.id.tv) {
+        } else if (viewId == R.id.btn) {
         }
     }
 
-    @OnLongClick({"tv", "btn", "tv1"})
-    boolean onViewLongClick(View view) {
-
-        return true;
+    @OnLongClick({"R.id.checkbox", "R.id.tv"})
+    boolean onViewLongClicked(View view) {
+        int viewId = view.getId();
+        if (viewId == R.id.checkbox) {
+        } else if (viewId == R.id.tv) {
+        }
+        return false;
     }
 
-    @OnClick({"tv1", "btn1"})
-    void onViewClick2(View view) {
+    @OnCheckedChanged({"R.id.checkbox"})
+    void onCheckChanged(CompoundButton buttonView, boolean isChecked) {
+        int viewId = buttonView.getId();
+        if (viewId == R.id.checkbox) {
+        }
+    }
 
+    @OnCheckedChanged(value = {"R.id.radio"}, type = CheckChangeType.RadioGroup)
+    void onCheckChanged(RadioGroup group, int checkedId) {
+        int viewId = group.getId();
+        if (viewId == R.id.radio) {
+        }
+    }
+
+    @OnTextChanged(value = {"R.id.tv", "R.id.btn"}, listen = OnTextChanged.Listen.ON_TEXT_CHANGE)
+    void onTextChange(CharSequence s, int start, int before, int count) {
+    }
+
+    @OnTextChanged(value = {"R.id.tv"}, listen = OnTextChanged.Listen.AFTER_TEXT_CHANGE)
+    void afterTextChanged(Editable s) {
+    }
+
+    @OnTextChanged(value = {"R.id.btn"}, listen = OnTextChanged.Listen.BEFORE_TEXT_CHANGE)
+    void beforeTextChanged(CharSequence s, int start, int count, int after) {
+    }
+
+    @OnPageChange(value = "R.id.vpg2", listen = OnPageChange.Listen.ON_PAGE_SCROLL_STATE_CHANGED)
+    void onVpg2PageScrollStateChanged(int state) {
+    }
+
+    @OnPageChange(value = "R.id.vpg1", listen = OnPageChange.Listen.ON_PAGE_SELECTED)
+    void onVpg1PageSelected(int position) {
+    }
+
+    @OnPageChange(value = "R.id.vpg2", listen = OnPageChange.Listen.ON_PAGE_SELECTED)
+    void onVpg2PageSelected(int position) {
+    }
+
+    @OnPageChange(value = "R.id.vpg1", listen = OnPageChange.Listen.ON_PAGE_SCROLLED)
+    void onVpg1PageScrolled(int position, float positionOffset, int positionOffsetPixels) {
     }
 }
