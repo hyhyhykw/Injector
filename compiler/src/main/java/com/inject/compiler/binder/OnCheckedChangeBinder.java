@@ -1,6 +1,5 @@
 package com.inject.compiler.binder;
 
-import com.inject.index.CheckChangeType;
 import com.inject.annotation.OnCheckedChanged;
 import com.inject.compiler.Common;
 import com.inject.compiler.entity.CustomInject;
@@ -8,6 +7,7 @@ import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.inject.compiler.entity.SingleMethodInfo;
+import com.inject.index.CheckChangeType;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 
@@ -104,14 +104,14 @@ public final class OnCheckedChangeBinder {
                         injectBuilder.addStatement("$T.setCheckedChange($N, instance::$N)",
                                 viewClick, idViewInfo.name, methodName);
                     } else if (Common.isNotNeedCast("android.widget.RadioGroup", type)) {//RadioGroup
-                        injectBuilder.addStatement("$T.setCheckedChange($N, instance::$N)",
+                        injectBuilder.addStatement("$T.setRadioChange($N, instance::$N)",
                                 viewClick, idViewInfo.name, methodName);
                     } else {
                         if (changeType == CheckChangeType.CompoundButton) {
                             injectBuilder.addStatement("$T.setCheckedChange(($T) $N, instance::$N)",
                                     viewClick, compoundButton, idViewInfo.name, methodName);
                         } else if (changeType == CheckChangeType.RadioGroup) {
-                            injectBuilder.addStatement("$T.setCheckedChange(($T) $N, instance::$N)",
+                            injectBuilder.addStatement("$T.setRadioChange(($T) $N, instance::$N)",
                                     viewClick, radioGroup, idViewInfo.name, methodName);
                         }
                     }
@@ -119,38 +119,32 @@ public final class OnCheckedChangeBinder {
                 } else {
                     boolean isAndroidRes = idEntity.isAndroidRes;
                     String id = idEntity.id;
-
-                    ClassName className;
-                    if (changeType == CheckChangeType.CompoundButton) {
-                        className = compoundButton;
-                    } else {
-                        className = radioGroup;
-                    }
+                    boolean isRadio = changeType != CheckChangeType.CompoundButton;
                     if (custom != null) {
                         if (isEmpty(custom.fieldName) && isEmpty(custom.methodName)) {
                             if (isAndroidRes) {
-                                injectBuilder.addStatement("$T.setCheckedChange(($T) instance.$L(android.R.id.$L), instance::$N)",
-                                        viewClick, className, custom.method, id, methodName);
+                                injectBuilder.addStatement("$T.$N(instance.$L(android.R.id.$L), instance::$N)",
+                                        viewClick, isRadio ? "setRadioChange" : "setCheckedChange", custom.method, id, methodName);
                             } else {
-                                injectBuilder.addStatement("$T.setCheckedChange(($T) instance.$L($T.id.$L), instance::$N)",
-                                        viewClick, className, custom.method, rCla, id, methodName);
+                                injectBuilder.addStatement("$T.$N(instance.$L($T.id.$L), instance::$N)",
+                                        viewClick, isRadio ? "setRadioChange" : "setCheckedChange", custom.method, rCla, id, methodName);
                             }
                         } else {
                             if (isAndroidRes) {
-                                injectBuilder.addStatement("$T.setCheckedChange(($T) view.findViewById(android.R.id.$L), instance::$N)",
-                                        viewClick, className, id, methodName);
+                                injectBuilder.addStatement("$T.$N(view.findViewById(android.R.id.$L), instance::$N)",
+                                        viewClick, isRadio ? "setRadioChange" : "setCheckedChange", id, methodName);
                             } else {
-                                injectBuilder.addStatement("$T.setCheckedChange(($T) view.findViewById($T.id.$L), instance::$N)",
-                                        viewClick, className, rCla, id, methodName);
+                                injectBuilder.addStatement("$T.$N(view.findViewById($T.id.$L), instance::$N)",
+                                        viewClick, isRadio ? "setRadioChange" : "setCheckedChange", rCla, id, methodName);
                             }
                         }
                     } else {
                         if (isAndroidRes) {
-                            injectBuilder.addStatement("$T.setCheckedChange(($T) instance.findViewById(android.R.id.$L), instance::$N)",
-                                    viewClick, className, id, methodName);
+                            injectBuilder.addStatement("$T.$N(instance.findViewById(android.R.id.$L), instance::$N)",
+                                    viewClick, isRadio ? "setRadioChange" : "setCheckedChange", id, methodName);
                         } else {
-                            injectBuilder.addStatement("$T.setCheckedChange(($T) instance.findViewById($T.id.$L), instance::$N)",
-                                    viewClick, className, rCla, id, methodName);
+                            injectBuilder.addStatement("$T.$N(instance.findViewById($T.id.$L), instance::$N)",
+                                    viewClick, isRadio ? "setRadioChange" : "setCheckedChange", rCla, id, methodName);
                         }
                     }
                 }

@@ -151,7 +151,10 @@ public final class ArrayBinder {
     }
 
     //创建BindArray代码
-    public static void createCode(ClassName rCla, CodeBlock.Builder injectBuilder, Set<ArrayInfo> arrayInfo) {
+    public static void createCode(ClassName rCla,
+                                  CodeBlock.Builder injectBuilder,
+                                  Set<ArrayInfo> arrayInfo,
+                                  boolean generateRes) {
         if (!arrayInfo.isEmpty()) {
             injectBuilder.add("/**\n * generate code by annotation BindArray {@link com.inject.annotation.BindArray}\n */\n");
         }
@@ -171,20 +174,28 @@ public final class ArrayBinder {
 
             ViewsType viewsType = info.type;
 
+            String resourcesName;
+            if (generateRes) {
+                resourcesName = "resources";
+            } else {
+                resourcesName = "context.getResources()";
+            }
+
+
             if (eleQualifiedName.equals("java.lang.String") && viewsType == ViewsType.Array) {
                 if (isAndroidRes) {
-                    injectBuilder.addStatement("instance.$N = context.getResources().getStringArray(android.R.array.$N)", varName, id);
+                    injectBuilder.addStatement("instance.$N = $N.getStringArray(android.R.array.$N)", varName, resourcesName, id);
                 } else {
-                    injectBuilder.addStatement("instance.$N = context.getResources().getStringArray($T.array.$N)", varName, rCla, id);
+                    injectBuilder.addStatement("instance.$N = $N.getStringArray($T.array.$N)", varName, resourcesName, rCla, id);
                 }
                 continue;
             }
             if (isAndroidRes) {
-                injectBuilder.addStatement("String[] array$L = context.getResources().getStringArray(android.R.array.$N)",
-                        i, id);
+                injectBuilder.addStatement("String[] array$L = $N.getStringArray(android.R.array.$N)",
+                        i, resourcesName, id);
             } else {
-                injectBuilder.addStatement("String[] array$L = context.getResources().getStringArray($T.array.$N)",
-                        i, rCla, id);
+                injectBuilder.addStatement("String[] array$L = $N.getStringArray($T.array.$N)",
+                        i, resourcesName, rCla, id);
             }
 
             ClassName listClass = null;

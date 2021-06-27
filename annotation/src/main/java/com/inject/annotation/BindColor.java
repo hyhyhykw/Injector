@@ -6,21 +6,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created time : 2021/6/22 14:09.
- *
+ * Created time : 2021/6/26 12:37.
+ * 自动绑定Color资源的注解 支持int color和ColorStateList
  * @author 10585
+ * @see android.content.res.ColorStateList
  */
 @Retention(RetentionPolicy.SOURCE)
-@Target(ElementType.METHOD)
-public @interface OnPageChange {
+@Target(ElementType.FIELD)
+public @interface BindColor {
     String value();
-
-    enum Listen {
-        ON_PAGE_SCROLLED,
-        ON_PAGE_SELECTED,
-        ON_PAGE_SCROLL_STATE_CHANGED
-    }
-
-
-    Listen listen() default Listen.ON_PAGE_SELECTED;
 }

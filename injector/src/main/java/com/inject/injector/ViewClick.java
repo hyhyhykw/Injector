@@ -49,7 +49,7 @@ public final class ViewClick {
      * @param view     视图
      * @param listener 点击事件
      */
-    public static void setCheckedChange(@Nullable RadioGroup view,
+    public static void setRadioChange(@Nullable RadioGroup view,
                                     @Nullable final RadioGroup.OnCheckedChangeListener listener) {
         if (null == view) return;
         if (null == listener) {

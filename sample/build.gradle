@@ -13,14 +13,16 @@ android {
         versionName "1.0"
         javaCompileOptions {
             annotationProcessorOptions {
-                arguments = [pkgName            : 'com.inject.inject.sample',
-                             claIndex           : 'MyInjectorIndex',
-                             myInject           : 'androidx.fragment.app.Fragment',
-                             injectViewMethod   : 'requireView',
-                             myInject1          : 'androidx.recyclerview.widget.RecyclerView.ViewHolder',
-                             injectViewField1   : 'itemView',
-                             contextInject      : 'androidx.fragment.app.Fragment',
-                             contextInjectMethod: 'requireContext'
+                arguments = [pkgName             : 'com.inject.inject.sample',
+                             claIndex            : 'MyInjectorIndex',
+                             myInject            : 'androidx.fragment.app.Fragment',
+                             injectViewMethod    : 'requireView',
+                             myInject1           : 'androidx.recyclerview.widget.RecyclerView.ViewHolder',
+                             injectViewField1    : 'itemView',
+                             contextInject       : 'androidx.fragment.app.Fragment',
+                             contextInjectMethod : 'requireContext',
+                             contextInject1      : 'android.view.View',
+                             contextInjectMethod1: 'getContext'
                 ]
             }
         }

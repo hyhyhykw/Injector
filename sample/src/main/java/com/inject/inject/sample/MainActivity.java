@@ -13,11 +13,13 @@ import com.inject.annotation.BindAnim;
 import com.inject.annotation.BindArray;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
+import com.inject.annotation.Dp;
 import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
+import com.inject.annotation.Sp;
 import com.inject.index.CheckChangeType;
 import com.inject.injector.Inject;
 
@@ -70,12 +72,27 @@ public class MainActivity extends AppCompatActivity {
     @BindView("radio")
     View rgp;
 
+
+    @Dp(12)
+    int dp12;
+
+    @Dp(13)
+    float dp13;
+
+    @Sp(12)
+    Long sp12;
+
+    @Sp(13)
+    Double sp13;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Inject.inject(this);
         mTv.setText("测试Inject");
+        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+
     }
 
 

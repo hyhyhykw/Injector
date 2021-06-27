@@ -11,10 +11,5 @@ import java.util.Map;
  */
 public interface InjectorIndex {
 
-    /**
-     * ad
-     *
-     * @return
-     */
     Map<String, Class<? extends Injector>> getIndex();
 }

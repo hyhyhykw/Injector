@@ -2,27 +2,36 @@ package com.inject.compiler;
 
 import com.inject.annotation.BindAnim;
 import com.inject.annotation.BindArray;
+import com.inject.annotation.BindColor;
+import com.inject.annotation.BindDrawable;
+import com.inject.annotation.BindString;
 import com.inject.annotation.BindView;
 import com.inject.annotation.BindViews;
-import com.inject.index.Injector;
-import com.inject.index.InjectorIndex;
+import com.inject.annotation.Dp;
 import com.inject.annotation.OnCheckedChanged;
 import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
+import com.inject.annotation.Sp;
 import com.inject.compiler.binder.AnimBinder;
 import com.inject.compiler.binder.ArrayBinder;
+import com.inject.compiler.binder.ColorBinder;
+import com.inject.compiler.binder.DpBinder;
+import com.inject.compiler.binder.DrawableBinder;
 import com.inject.compiler.binder.OnCheckedChangeBinder;
 import com.inject.compiler.binder.OnClickBinder;
 import com.inject.compiler.binder.OnLongClickBinder;
 import com.inject.compiler.binder.OnPageChangeBinder;
 import com.inject.compiler.binder.OnTextChangeBinder;
+import com.inject.compiler.binder.SpBinder;
+import com.inject.compiler.binder.StringBinder;
 import com.inject.compiler.binder.ViewBinder;
 import com.inject.compiler.binder.ViewsBinder;
 import com.inject.compiler.entity.ArrayInfo;
 import com.inject.compiler.entity.ContextInject;
 import com.inject.compiler.entity.CustomInject;
+import com.inject.compiler.entity.DpInfo;
 import com.inject.compiler.entity.IdEntity;
 import com.inject.compiler.entity.IdViewInfo;
 import com.inject.compiler.entity.JavaFileInfo;
@@ -30,6 +39,8 @@ import com.inject.compiler.entity.PageChangeInfo;
 import com.inject.compiler.entity.SingleMethodInfo;
 import com.inject.compiler.entity.TextChangeInfo;
 import com.inject.compiler.entity.ViewsBindInfo;
+import com.inject.index.Injector;
+import com.inject.index.InjectorIndex;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -117,7 +128,14 @@ public class BindProcessor extends AbstractProcessor {
     public Set<String> getSupportedAnnotationTypes() {
         Set<String> types = new HashSet<>();
         types.add(BindAnim.class.getName());
+        types.add(BindDrawable.class.getName());
+        types.add(BindString.class.getName());
+        types.add(BindColor.class.getName());
         types.add(BindArray.class.getName());
+
+        types.add(Dp.class.getName());
+        types.add(Sp.class.getName());
+
         types.add(BindView.class.getName());
         types.add(OnClick.class.getName());
         types.add(BindViews.class.getName());
@@ -222,6 +240,12 @@ public class BindProcessor extends AbstractProcessor {
 
         Map<String, JavaFileInfo> specs = new HashMap<>();
 
+        //获取Dp注解的所有信息
+        DpBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取Sp注解的所有信息
+        SpBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
         //获取BindView注解的所有信息
         ViewBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
@@ -245,6 +269,15 @@ public class BindProcessor extends AbstractProcessor {
 
         //获取BindAnim注解的所有信息
         AnimBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取BindDrawable注解的所有信息
+        DrawableBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取BindColor注解的所有信息
+        ColorBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
+        //获取BindString注解的所有信息
+        StringBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
         //获取BindArray注解的所有信息
         ArrayBinder.parseAnnotation(roundEnv, elementUtils, specs);
@@ -274,8 +307,8 @@ public class BindProcessor extends AbstractProcessor {
 
         CodeBlock.Builder codeBuilder = CodeBlock.builder();
 
-        @SuppressWarnings("SimpleDateFormat")
-        SimpleDateFormat format = new SimpleDateFormat();
+
+        SimpleDateFormat format = (SimpleDateFormat) SimpleDateFormat.getInstance();
         format.applyPattern("yyyy/MM/dd hh:mm");
         String dateTime = format.format(new Date());
 
@@ -292,6 +325,7 @@ public class BindProcessor extends AbstractProcessor {
 
             CodeBlock.Builder injectBuilder = CodeBlock.builder();
             injectBuilder.addStatement("$T instance = ($T) object", instance, instance);
+
             if (custom != null) {
                 String fieldName = custom.fieldName;
                 String methodName = custom.methodName;
@@ -306,6 +340,13 @@ public class BindProcessor extends AbstractProcessor {
 
             Map<IdEntity, VariableElement> varMap = value.viewIdMap;
             Map<IdEntity, VariableElement> animMap = value.animMap;
+            Map<IdEntity, VariableElement> drawableMap = value.drawableMap;
+            Map<IdEntity, VariableElement> colorMap = value.colorMap;
+            Map<IdEntity, VariableElement> stringMap = value.stringMap;
+
+            Set<DpInfo> dpInfo = value.dpInfo;
+            Set<DpInfo> spInfo = value.spInfo;
+
             Set<SingleMethodInfo> methodMap = value.onClickMethodMap;
             Set<ViewsBindInfo> viewsList = value.viewsList;
             Set<ArrayInfo> arrayInfo = value.arrayInfo;
@@ -322,15 +363,47 @@ public class BindProcessor extends AbstractProcessor {
             ViewBinder.createCode(rCla, custom, injectBuilder, varMap, viewsMap);
 
             //对于需要使用context对象的注解，创建一个context变量
-            if (!animMap.isEmpty() || !arrayInfo.isEmpty()) {
+            if (!animMap.isEmpty() || !arrayInfo.isEmpty() ||
+                    !drawableMap.isEmpty() || !colorMap.isEmpty() ||
+                    !stringMap.isEmpty() || !dpInfo.isEmpty() || !spInfo.isEmpty()) {
                 createContextField(type, qualifiedName, injectBuilder);
             }
+
+            boolean generateRes = false;
+            //
+            ClassName resources = ClassName.get("android.content.res", "Resources");
+            ClassName metrics = ClassName.get("android.util", "DisplayMetrics");
+            if (!dpInfo.isEmpty()) {
+                generateRes = true;
+                injectBuilder.add("/**\n * get resources from {@link $L}\n */\n", qualifiedName);
+                injectBuilder.addStatement("$T resources = context.getResources()", resources);
+                injectBuilder.addStatement("$T metrics = resources.getDisplayMetrics()", metrics);
+            }
+            //Dp
+            DpBinder.createCode(injectBuilder, dpInfo);
+            if (!generateRes && !spInfo.isEmpty()) {
+                generateRes = true;
+                injectBuilder.add("/**\n * get resources from {@link $L}\n */\n", qualifiedName);
+                injectBuilder.addStatement("$T resources = context.getResources()", resources);
+                injectBuilder.addStatement("$T metrics = resources.getDisplayMetrics()", metrics);
+            }
+            //Sp
+            SpBinder.createCode(injectBuilder, spInfo);
 
             //BindAnim
             AnimBinder.createCode(rCla, injectBuilder, animMap);
 
+            //BindDrawable
+            DrawableBinder.createCode(rCla, injectBuilder, drawableMap);
+
+            //BindColor
+            ColorBinder.createCode(rCla, injectBuilder, colorMap);
+
+            //BindString
+            StringBinder.createCode(rCla, injectBuilder, stringMap);
+
             //BindArray
-            ArrayBinder.createCode(rCla, injectBuilder, arrayInfo);
+            ArrayBinder.createCode(rCla, injectBuilder, arrayInfo, generateRes);
 
             //BindViews
             ViewsBinder.createCode(rCla, custom, injectBuilder, viewsList, viewsMap);
@@ -343,6 +416,7 @@ public class BindProcessor extends AbstractProcessor {
 
             //OnCheckChange
             OnCheckedChangeBinder.createCode(rCla, custom, injectBuilder, checkedChangedMethodMap, viewClick, viewsMap);
+
             //OnPageChange
             OnPageChangeBinder.createCode(rCla, custom, injectBuilder, pageChangeInfo, viewsMap);
 

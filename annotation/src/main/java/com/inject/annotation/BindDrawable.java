@@ -6,21 +6,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created time : 2021/6/22 14:09.
- *
+ * Created time : 2021/6/26 12:36.
+ * 自动绑定Drawable资源的注解
  * @author 10585
  */
 @Retention(RetentionPolicy.SOURCE)
-@Target(ElementType.METHOD)
-public @interface OnPageChange {
+@Target(ElementType.FIELD)
+public @interface BindDrawable {
     String value();
-
-    enum Listen {
-        ON_PAGE_SCROLLED,
-        ON_PAGE_SELECTED,
-        ON_PAGE_SCROLL_STATE_CHANGED
-    }
-
-
-    Listen listen() default Listen.ON_PAGE_SELECTED;
 }
