@@ -151,7 +151,7 @@ public final class OnCheckedChangeBinder {
 
             }
         }
-        if (!viewsMap.isEmpty()) {
+        if (!methodMap.isEmpty()) {
             injectBuilder.add("\n");
         }
     }

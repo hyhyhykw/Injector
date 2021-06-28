@@ -1,6 +1,7 @@
 package com.inject.compiler.binder;
 
 import com.inject.annotation.Dp;
+import com.inject.compiler.Common;
 import com.inject.compiler.entity.DpInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.squareup.javapoet.CodeBlock;
@@ -50,8 +51,6 @@ public final class DpBinder {
             TypeMirror typeMirror = variableElement.asType();
             TypeKind kind = typeMirror.getKind();
 
-            boolean isPrimitive;
-            boolean isFloat;
             String priType;
             if (!typeKinds.contains(kind)) {
                 String type;
@@ -76,19 +75,15 @@ public final class DpBinder {
                         priType = "long";
                         break;
                     case "java.lang.Float":
-                        priType = "float";
+                        priType = "";
                         break;
                     case "java.lang.Double":
                         priType = "double";
                         break;
                 }
-
-                isFloat = type.equals("java.lang.Double") || type.equals("java.lang.Float");
-                isPrimitive = false;
             } else {
-                priType = "";
-                isPrimitive = true;
-                isFloat = kind == TypeKind.FLOAT || kind == TypeKind.DOUBLE;
+                boolean isFloat = kind == TypeKind.FLOAT || kind == TypeKind.DOUBLE;
+                priType = isFloat ? "" : "int";
             }
 
 
@@ -113,8 +108,6 @@ public final class DpBinder {
 
 
             DpInfo dpInfo = new DpInfo(value + "", variableElement.getSimpleName().toString());
-            dpInfo.isFloat = isFloat;
-            dpInfo.isPrimitive = isPrimitive;
             dpInfo.type = priType;
             javaFileInfo.dpInfo.add(dpInfo);
         }
@@ -127,14 +120,11 @@ public final class DpBinder {
 //            return (int) (dpVal * scale + 0.5f);
             injectBuilder.addStatement("float scale = metrics.density");
             for (DpInfo dpInfo : info) {
-                if (dpInfo.isPrimitive) {
-                    if (dpInfo.isFloat) {
-                        injectBuilder.addStatement("instance.$N = $Nf * scale + 0.5f", dpInfo.name, dpInfo.value);
-                    } else {
-                        injectBuilder.addStatement("instance.$N = (int) ($Nf * scale + 0.5f)", dpInfo.name, dpInfo.value);
-                    }
-                } else {
-                    injectBuilder.addStatement("instance.$N = ($N) ($Nf * scale + 0.5f)", dpInfo.name, dpInfo.type, dpInfo.value);
+                String type = dpInfo.type;
+                if (!Common.isEmpty(type)) {
+                    injectBuilder.addStatement("instance.$N = ($N) ($Nf * scale + 0.5f)", dpInfo.name, type, dpInfo.value);
+                }else{
+                    injectBuilder.addStatement("instance.$N = $Nf * scale + 0.5f", dpInfo.name, dpInfo.value);
                 }
             }
             injectBuilder.add("\n");

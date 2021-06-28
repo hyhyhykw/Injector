@@ -131,7 +131,7 @@ public final class OnClickBinder {
 
             }
         }
-        if (!viewsMap.isEmpty()) {
+        if (!methodMap.isEmpty()) {
             injectBuilder.add("\n");
         }
     }

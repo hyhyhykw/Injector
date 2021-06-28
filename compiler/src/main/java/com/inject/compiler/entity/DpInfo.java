@@ -14,7 +14,5 @@ public final class DpInfo {
         this.name = name;
     }
 
-    public boolean isFloat;
-    public boolean isPrimitive;
     public String type;
 }

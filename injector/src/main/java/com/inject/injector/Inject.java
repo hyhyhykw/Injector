@@ -1,5 +1,6 @@
 package com.inject.injector;
 
+import android.util.Log;
 import android.view.View;
 
 import com.inject.index.Injector;
@@ -34,12 +35,14 @@ public class Inject {
         Class<? extends Injector> aClass = mInjectorIndex.getIndex()
                 .get(object.getClass().getName());
 
+        if (aClass == null) return;
+
         try {
             Injector injector = aClass.newInstance();
 
             injector.inject(object);
-        } catch (InstantiationException | IllegalAccessException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            Log.e("Error", e.getMessage(), e);
         }
     }
 

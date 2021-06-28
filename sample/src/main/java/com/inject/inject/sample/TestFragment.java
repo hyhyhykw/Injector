@@ -46,8 +46,11 @@ public class TestFragment extends MyFrg {
         Inject.inject(this);
     }
 
-    @OnClick({"tv1", "btn1"})
-    void onViewClick(View view) {
-
+    @OnClick({"R.id.tv1", "R.id.btn1"} )
+    void onViewClicked(View view) {
+        int viewId = view.getId();
+        if (viewId == R.id.tv1) {
+        } else if (viewId == R.id.btn1) {
+        }
     }
 }

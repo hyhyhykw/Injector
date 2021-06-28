@@ -1,6 +1,7 @@
 package com.inject.compiler.binder;
 
 import com.inject.annotation.Sp;
+import com.inject.compiler.Common;
 import com.inject.compiler.entity.DpInfo;
 import com.inject.compiler.entity.JavaFileInfo;
 import com.squareup.javapoet.CodeBlock;
@@ -49,8 +50,7 @@ public final class SpBinder {
             TypeMirror typeMirror = variableElement.asType();
             TypeKind kind = typeMirror.getKind();
 
-            boolean isPrimitive;
-            boolean isFloat;
+
             String priType;
             if (!typeKinds.contains(kind)) {
                 String type;
@@ -74,18 +74,15 @@ public final class SpBinder {
                         priType = "long";
                         break;
                     case "java.lang.Float":
-                        priType = "float";
+                        priType = "";
                         break;
                     case "java.lang.Double":
                         priType = "double";
                         break;
                 }
-                isFloat = type.equals("java.lang.Double") || type.equals("java.lang.Float");
-                isPrimitive = false;
             } else {
-                priType = "";
-                isPrimitive = true;
-                isFloat = kind == TypeKind.FLOAT || kind == TypeKind.DOUBLE;
+                boolean isFloat = kind == TypeKind.FLOAT || kind == TypeKind.DOUBLE;
+                priType = isFloat ? "" : "int";
             }
 
             //类信息
@@ -107,10 +104,7 @@ public final class SpBinder {
                 specs.put(qualifiedName, javaFileInfo);
             }
 
-
             DpInfo dpInfo = new DpInfo(value + "", variableElement.getSimpleName().toString());
-            dpInfo.isFloat = isFloat;
-            dpInfo.isPrimitive = isPrimitive;
             dpInfo.type = priType;
             javaFileInfo.spInfo.add(dpInfo);
         }
@@ -121,14 +115,12 @@ public final class SpBinder {
             injectBuilder.add("/**\n * generate code by annotation Sp {@link com.inject.annotation.Sp}\n */\n");
             injectBuilder.addStatement("float fontScale = metrics.scaledDensity");
             for (DpInfo dpInfo : info) {
-                if (!dpInfo.isPrimitive) {
-                    injectBuilder.addStatement("instance.$N = ($N) ($Nf * fontScale + 0.5f)", dpInfo.name, dpInfo.type, dpInfo.value);
-                    continue;
-                }
-                if (dpInfo.isFloat) {
-                    injectBuilder.addStatement("instance.$N = $Nf * fontScale + 0.5f", dpInfo.name, dpInfo.value);
+                String type = dpInfo.type;
+
+                if (!Common.isEmpty(type)) {
+                    injectBuilder.addStatement("instance.$N = ($N) ($Nf * fontScale + 0.5f)", dpInfo.name, type, dpInfo.value);
                 } else {
-                    injectBuilder.addStatement("instance.$N = (int) ($Nf * fontScale + 0.5f)", dpInfo.name, dpInfo.value);
+                    injectBuilder.addStatement("instance.$N = $Nf * fontScale + 0.5f", dpInfo.name, dpInfo.value);
                 }
             }
             injectBuilder.add("\n");

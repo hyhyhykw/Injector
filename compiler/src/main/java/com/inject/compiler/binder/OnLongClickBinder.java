@@ -125,7 +125,7 @@ public final class OnLongClickBinder {
                 }
             }
         }
-        if (!viewsMap.isEmpty()) {
+        if (!methodMap.isEmpty()) {
             injectBuilder.add("\n");
         }
     }

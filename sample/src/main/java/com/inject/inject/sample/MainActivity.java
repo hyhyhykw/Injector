@@ -91,8 +91,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Inject.inject(this);
         mTv.setText("测试Inject");
-        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-
     }
 
 

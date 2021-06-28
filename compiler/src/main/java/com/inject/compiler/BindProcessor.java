@@ -46,7 +46,6 @@ import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
@@ -423,10 +422,8 @@ public class BindProcessor extends AbstractProcessor {
             //OnTextChange
             OnTextChangeBinder.createCode(rCla, custom, injectBuilder, textChangeInfo, viewsMap);
 
-            ParameterSpec.Builder param = ParameterSpec.builder(Object.class, "object");
-
             MethodSpec.Builder inject = MethodSpec.methodBuilder("inject")
-                    .addParameter(param.build())
+                    .addParameter(Object.class, "object")
                     .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC)
                     .addCode(injectBuilder.build());
@@ -439,7 +436,7 @@ public class BindProcessor extends AbstractProcessor {
                             "Created time : " + dateTime + ".\nThe injector of " + claName +
                                     " \n\n@author James\n" +
                                     "@see com.inject.index.Injector\n" +
-                                    "@see " + packageName + "." + claName
+                                    "@see " + instance.toString()
                     )
                     .addMethod(inject.build())
                     .addSuperinterface(Injector.class)
