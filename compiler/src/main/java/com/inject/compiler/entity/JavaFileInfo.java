@@ -25,6 +25,7 @@ public final class JavaFileInfo {
     public final Map<IdEntity, VariableElement> stringMap = new HashMap<>();
 
     public final Set<SingleMethodInfo> onClickMethodMap = new HashSet<>();
+    public final Set<SingleMethodInfo> onTouchMap = new HashSet<>();
     public final Set<SingleMethodInfo> checkedChangedMethodMap = new HashSet<>();
     public final Set<SingleMethodInfo> longClickMethodMap = new HashSet<>();
     public final Set<PageChangeInfo> pageChangeInfo = new HashSet<>();

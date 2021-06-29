@@ -13,6 +13,7 @@ import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
+import com.inject.annotation.OnTouch;
 import com.inject.annotation.Sp;
 import com.inject.compiler.binder.AnimBinder;
 import com.inject.compiler.binder.ArrayBinder;
@@ -24,6 +25,7 @@ import com.inject.compiler.binder.OnClickBinder;
 import com.inject.compiler.binder.OnLongClickBinder;
 import com.inject.compiler.binder.OnPageChangeBinder;
 import com.inject.compiler.binder.OnTextChangeBinder;
+import com.inject.compiler.binder.OnTouchBinder;
 import com.inject.compiler.binder.SpBinder;
 import com.inject.compiler.binder.StringBinder;
 import com.inject.compiler.binder.ViewBinder;
@@ -142,6 +144,7 @@ public class BindProcessor extends AbstractProcessor {
         types.add(OnTextChanged.class.getName());
         types.add(OnLongClick.class.getName());
         types.add(OnCheckedChanged.class.getName());
+        types.add(OnTouch.class.getName());
 
         return types;
     }
@@ -254,6 +257,9 @@ public class BindProcessor extends AbstractProcessor {
         //获取OnClick注解的所有信息
         OnClickBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
+        //获取OnTouch注解的所有信息
+        OnTouchBinder.parseAnnotation(roundEnv, elementUtils, specs);
+
         //获取OnLongClick注解的所有信息
         OnLongClickBinder.parseAnnotation(roundEnv, elementUtils, specs);
 
@@ -347,6 +353,7 @@ public class BindProcessor extends AbstractProcessor {
             Set<DpInfo> spInfo = value.spInfo;
 
             Set<SingleMethodInfo> methodMap = value.onClickMethodMap;
+            Set<SingleMethodInfo> onTouchMap = value.onTouchMap;
             Set<ViewsBindInfo> viewsList = value.viewsList;
             Set<ArrayInfo> arrayInfo = value.arrayInfo;
             Set<PageChangeInfo> pageChangeInfo = value.pageChangeInfo;
@@ -409,6 +416,9 @@ public class BindProcessor extends AbstractProcessor {
 
             //onClick 方法
             OnClickBinder.createCode(rCla, custom, injectBuilder, methodMap, viewClick, viewsMap);
+
+            //OnTouch方法
+            OnTouchBinder.createCode(rCla, custom, injectBuilder, onTouchMap, viewClick, viewsMap);
 
             //onLongClick 方法
             OnLongClickBinder.createCode(rCla, custom, injectBuilder, longClickMethodMap, viewClick, viewsMap);

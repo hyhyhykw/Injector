@@ -2,6 +2,7 @@ package com.inject.inject.sample;
 
 import android.os.Bundle;
 import android.text.Editable;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Animation;
 import android.widget.Button;
@@ -19,6 +20,7 @@ import com.inject.annotation.OnClick;
 import com.inject.annotation.OnLongClick;
 import com.inject.annotation.OnPageChange;
 import com.inject.annotation.OnTextChanged;
+import com.inject.annotation.OnTouch;
 import com.inject.annotation.Sp;
 import com.inject.index.CheckChangeType;
 import com.inject.injector.Inject;
@@ -100,6 +102,11 @@ public class MainActivity extends AppCompatActivity {
         if (viewId == R.id.tv) {
         } else if (viewId == R.id.btn) {
         }
+    }
+
+    @OnTouch({"R.id.tv", "R.id.btn"})
+    boolean onViewTouch(View v, MotionEvent event) {
+        return false;
     }
 
     @OnLongClick({"R.id.checkbox", "R.id.tv"})
