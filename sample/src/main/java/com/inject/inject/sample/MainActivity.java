@@ -106,6 +106,14 @@ public class MainActivity extends AppCompatActivity {
 
     @OnTouch({"R.id.tv", "R.id.btn"})
     boolean onViewTouch(View v, MotionEvent event) {
+        int action = event.getAction();
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_MOVE:
+                break;
+        }
         return false;
     }
 
